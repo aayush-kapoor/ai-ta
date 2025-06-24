@@ -94,7 +94,7 @@ function App() {
       <Router>
         <AppRoutes />
         <Toaster 
-          position="top-right"
+          position="bottom-right"
           toastOptions={{
             style: {
               background: 'white',
@@ -102,7 +102,6 @@ function App() {
               color: '#374151',
             },
           }}
-          closeButton
         />
       </Router>
     </AuthProvider>
