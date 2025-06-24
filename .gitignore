@@ -27,3 +27,5 @@ dist-ssr
 .env.example
 .bolt
 supabase
+
+aita
