@@ -3,9 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'sonner'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { Layout } from './components/Layout'
-import { Login } from './components/Login'
+import Login from './components/Login'
 import { TeacherDashboard } from './pages/teacher/TeacherDashboard'
 import { CourseList } from './pages/teacher/CourseList'
+import NewCourse from './pages/teacher/NewCourse'
 import { StudentDashboard } from './pages/student/StudentDashboard'
 import { StudentCourses } from './pages/student/StudentCourses'
 
@@ -51,6 +52,14 @@ function AppRoutes() {
         <ProtectedRoute role="teacher">
           <Layout>
             <CourseList />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/teacher/courses/new" element={
+        <ProtectedRoute role="teacher">
+          <Layout>
+            <NewCourse />
           </Layout>
         </ProtectedRoute>
       } />
