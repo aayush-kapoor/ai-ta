@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { BookOpen, FileText, Clock, CheckCircle, Plus } from 'lucide-react'
-import { Course, Assignment, Submission, CourseEnrollment } from '../../types'
-import { mockAPI } from '../../services/mockAPI'
+import { Assignment, Submission, Enrollment } from '../../types'
+import { enrollmentAPI, submissionAPI } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 
 export function StudentDashboard() {
   const { user } = useAuth()
-  const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([])
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
@@ -18,14 +18,15 @@ export function StudentDashboard() {
       if (!user) return
 
       try {
-        const [enrollmentsData, assignmentsData, submissionsData] = await Promise.all([
-          mockAPI.getStudentEnrollments(user.id),
-          mockAPI.getAssignmentsByStudent(user.id),
-          mockAPI.getSubmissionsByStudent(user.id)
+        const [enrollmentsData, submissionsData] = await Promise.all([
+          enrollmentAPI.getByStudent(user.id),
+          submissionAPI.getByStudent(user.id)
         ])
         setEnrollments(enrollmentsData)
-        setAssignments(assignmentsData)
         setSubmissions(submissionsData)
+        
+        // For now, we'll skip assignments since we need to refactor how we get them
+        setAssignments([])
       } catch (error) {
         console.error('Error loading dashboard data:', error)
         toast.error('Failed to load dashboard data. Please refresh the page.')

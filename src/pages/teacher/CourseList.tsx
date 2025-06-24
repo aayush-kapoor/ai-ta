@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { BookOpen, Plus, Users, FileText } from 'lucide-react'
 import { Course } from '../../types'
-import { mockAPI } from '../../services/mockAPI'
+import { courseAPI } from '../../services/api'
 
 export function CourseList() {
   const [courses, setCourses] = useState<Course[]>([])
@@ -12,7 +12,7 @@ export function CourseList() {
   useEffect(() => {
     const loadCourses = async () => {
       try {
-        const coursesData = await mockAPI.getCourses()
+        const coursesData = await courseAPI.getAll()
         setCourses(coursesData)
       } catch (error) {
         console.error('Error loading courses:', error)

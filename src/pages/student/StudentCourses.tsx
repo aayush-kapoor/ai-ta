@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { BookOpen, Users, FileText, Plus } from 'lucide-react'
-import { Course, CourseEnrollment } from '../../types'
-import { mockAPI } from '../../services/mockAPI'
+import { Course, Enrollment } from '../../types'
+import { courseAPI, enrollmentAPI } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 
 export function StudentCourses() {
   const { user } = useAuth()
-  const [enrolledCourses, setEnrolledCourses] = useState<CourseEnrollment[]>([])
+  const [enrolledCourses, setEnrolledCourses] = useState<Enrollment[]>([])
   const [availableCourses, setAvailableCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
   const [enrolling, setEnrolling] = useState<string | null>(null)
@@ -19,8 +19,8 @@ export function StudentCourses() {
 
       try {
         const [enrolled, available] = await Promise.all([
-          mockAPI.getStudentEnrollments(user.id),
-          mockAPI.getAvailableCourses(user.id)
+          enrollmentAPI.getByStudent(user.id),
+          courseAPI.getAll()
         ])
         setEnrolledCourses(enrolled)
         setAvailableCourses(available)
@@ -40,12 +40,12 @@ export function StudentCourses() {
 
     setEnrolling(courseId)
     try {
-      await mockAPI.enrollStudent(courseId, user.id)
+      await enrollmentAPI.enroll(courseId, user.id)
       
       // Refresh courses
       const [enrolled, available] = await Promise.all([
-        mockAPI.getStudentEnrollments(user.id),
-        mockAPI.getAvailableCourses(user.id)
+        enrollmentAPI.getByStudent(user.id),
+        courseAPI.getAll()
       ])
       setEnrolledCourses(enrolled)
       setAvailableCourses(available)

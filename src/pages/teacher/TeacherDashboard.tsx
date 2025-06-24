@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { BookOpen, Users, FileText, TrendingUp, Plus } from 'lucide-react'
 import { Course, Assignment, Submission } from '../../types'
-import { mockAPI } from '../../services/mockAPI'
+import { courseAPI, assignmentAPI, submissionAPI } from '../../services/api'
 
 export function TeacherDashboard() {
   const [courses, setCourses] = useState<Course[]>([])
@@ -14,14 +14,37 @@ export function TeacherDashboard() {
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
-        const [coursesData, assignmentsData, submissionsData] = await Promise.all([
-          mockAPI.getCourses(),
-          mockAPI.getAssignments(),
-          mockAPI.getSubmissions()
-        ])
+        // Load courses data - we can get this directly
+        const coursesData = await courseAPI.getAll()
         setCourses(coursesData)
-        setAssignments(assignmentsData)
-        setSubmissions(submissionsData)
+        
+        // For assignments and submissions, we need to aggregate from all courses
+        const allAssignments: Assignment[] = []
+        const allSubmissions: Submission[] = []
+        
+        for (const course of coursesData) {
+          try {
+            const courseAssignments = await assignmentAPI.getByCourse(course.id)
+            allAssignments.push(...courseAssignments)
+            
+            // Get submissions for each assignment
+            for (const assignment of courseAssignments) {
+              try {
+                const assignmentSubmissions = await submissionAPI.getByAssignment(assignment.id)
+                allSubmissions.push(...assignmentSubmissions)
+              } catch (submissionError) {
+                // Individual assignment submission fetch failed - continue with others
+                console.warn(`Failed to load submissions for assignment ${assignment.id}:`, submissionError)
+              }
+            }
+          } catch (assignmentError) {
+            // Individual course assignment fetch failed - continue with others
+            console.warn(`Failed to load assignments for course ${course.id}:`, assignmentError)
+          }
+        }
+        
+        setAssignments(allAssignments)
+        setSubmissions(allSubmissions)
       } catch (error) {
         console.error('Error loading dashboard data:', error)
         toast.error('Failed to load dashboard data. Please refresh the page.')
