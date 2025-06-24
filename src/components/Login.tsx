@@ -3,43 +3,39 @@ import { toast } from 'sonner'
 import { useAuth } from '../contexts/AuthContext'
 import { BookOpen, Lock, Mail, AlertCircle } from 'lucide-react'
 
-export function Login() {
+export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { login } = useAuth()
+  const [error, setError] = useState('')
+  const { signIn } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
     setLoading(true)
+    setError('')
 
     try {
-      const success = await login(email, password)
-      if (!success) {
-        const errorMessage = 'Invalid email or password'
-        setError(errorMessage)
-        toast.error(errorMessage)
+      const { error } = await signIn(email, password)
+      
+      if (error) {
+        setError(error.message)
+        toast.error(error.message)
       } else {
         toast.success('Successfully logged in!')
       }
     } catch (err) {
-      const errorMessage = 'An error occurred during login'
-      setError(errorMessage)
-      toast.error(errorMessage)
       console.error('Login error:', err)
+      setError('Login failed. Please check your credentials.')
+      toast.error('Login failed. Please check your credentials.')
     } finally {
       setLoading(false)
     }
   }
 
   const demoAccounts = [
-    { email: 'teacher@university.edu', role: 'Teacher', name: 'Dr. Sarah Johnson' },
-    { email: 'john.doe@student.edu', role: 'Student', name: 'John Doe' },
-    { email: 'jane.smith@student.edu', role: 'Student', name: 'Jane Smith' },
-    { email: 'mike.wilson@student.edu', role: 'Student', name: 'Mike Wilson' },
-    { email: 'lisa.chen@student.edu', role: 'Student', name: 'Lisa Chen' },
+    { email: 'teacher@example.com', role: 'Teacher', name: 'Dr. Sarah Johnson' },
+    { email: 'student@example.com', role: 'Student', name: 'John Doe' },
   ]
 
   return (
@@ -141,9 +137,9 @@ export function Login() {
                 </button>
               ))}
             </div>
-            <p className="mt-3 text-xs text-gray-500 text-center">
+            {/* <p className="mt-3 text-xs text-gray-500 text-center">
               All accounts use password: <code className="bg-gray-200 px-1 rounded">password123</code>
-            </p>
+            </p> */}
           </div>
         </div>
       </div>
