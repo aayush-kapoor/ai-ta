@@ -10,6 +10,7 @@ import { CourseDetail } from './pages/teacher/CourseDetail'
 import { NewAssignment } from './pages/teacher/NewAssignment'
 import { EditAssignment } from './pages/teacher/EditAssignment'
 import { AssignmentDetail } from './pages/teacher/AssignmentDetail'
+import { SubmissionDetail } from './pages/teacher/SubmissionDetail'
 import NewCourse from './pages/teacher/NewCourse'
 import { StudentDashboard } from './pages/student/StudentDashboard'
 import { StudentCourses } from './pages/student/StudentCourses'
@@ -98,6 +99,14 @@ function AppRoutes() {
         <ProtectedRoute role="teacher">
           <Layout>
             <EditAssignment />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/teacher/courses/:courseId/assignments/:assignmentId/submissions/:submissionId" element={
+        <ProtectedRoute role="teacher">
+          <Layout>
+            <SubmissionDetail />
           </Layout>
         </ProtectedRoute>
       } />

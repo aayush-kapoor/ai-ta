@@ -314,36 +314,90 @@ export function StudentAssignmentView() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Submit Assignment</h3>
                 
                 {submission ? (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <CheckCircle className="w-6 h-6 text-green-600" />
+                  <div className="space-y-4">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <CheckCircle className="w-6 h-6 text-green-600" />
+                        <div>
+                          <h4 className="font-medium text-green-900">Assignment Submitted</h4>
+                          <p className="text-green-700 text-sm">
+                            Submitted on {submission.submitted_at ? new Date(submission.submitted_at).toLocaleDateString() : 'Unknown'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {submission.original_filename && (
+                        <div className="bg-white rounded-lg border border-green-200 p-4 mb-4">
+                          <div className="flex items-center space-x-3">
+                            <FileText className="w-5 h-5 text-gray-600" />
+                            <div>
+                              <p className="font-medium text-gray-900">{submission.original_filename}</p>
+                              <p className="text-sm text-gray-600">
+                                {submission.file_size ? `${(submission.file_size / 1024 / 1024).toFixed(2)} MB` : 'Unknown size'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
                       <div>
-                        <h4 className="font-medium text-green-900">Assignment Submitted</h4>
                         <p className="text-green-700 text-sm">
-                          Submitted on {submission.submitted_at ? new Date(submission.submitted_at).toLocaleDateString() : 'Unknown'}
+                          You can resubmit by uploading a new file below. This will replace your current submission.
                         </p>
                       </div>
                     </div>
-                    
-                    {submission.original_filename && (
-                      <div className="bg-white rounded-lg border border-green-200 p-4">
-                        <div className="flex items-center space-x-3">
-                          <FileText className="w-5 h-5 text-gray-600" />
+
+                    {/* Grade Display */}
+                    {submission.grade !== null ? (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                        <div className="flex items-center space-x-3 mb-4">
+                          <CheckCircle className="w-6 h-6 text-blue-600" />
                           <div>
-                            <p className="font-medium text-gray-900">{submission.original_filename}</p>
-                            <p className="text-sm text-gray-600">
-                              {submission.file_size ? `${(submission.file_size / 1024 / 1024).toFixed(2)} MB` : 'Unknown size'}
+                            <h4 className="font-medium text-blue-900">Grade Received</h4>
+                            <p className="text-blue-700 text-sm">
+                              {submission.graded_at ? `Graded on ${new Date(submission.graded_at).toLocaleDateString()}` : 'Recently graded'}
                             </p>
                           </div>
                         </div>
+                        
+                        <div className="bg-white rounded-lg border border-blue-200 p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-lg font-semibold text-gray-900">Your Grade:</span>
+                            <span className="text-2xl font-bold text-blue-600">
+                              {submission.grade} / {assignment.total_points}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Percentage:</span>
+                            <span className={`text-lg font-semibold ${
+                              (submission.grade / assignment.total_points) >= 0.9 ? 'text-green-600' :
+                              (submission.grade / assignment.total_points) >= 0.8 ? 'text-blue-600' :
+                              (submission.grade / assignment.total_points) >= 0.7 ? 'text-yellow-600' :
+                              (submission.grade / assignment.total_points) >= 0.6 ? 'text-orange-600' : 'text-red-600'
+                            }`}>
+                              {Math.round((submission.grade / assignment.total_points) * 100)}%
+                            </span>
+                          </div>
+                        </div>
+
+                        {submission.feedback && (
+                          <div className="mt-4 bg-white rounded-lg border border-blue-200 p-4">
+                            <h5 className="font-medium text-gray-900 mb-2">Instructor Feedback:</h5>
+                            <p className="text-gray-700 whitespace-pre-wrap">{submission.feedback}</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : submission.status === 'submitted' && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div className="flex items-center space-x-2">
+                          <Clock className="w-5 h-5 text-yellow-600" />
+                          <p className="text-yellow-800 font-medium">Awaiting Grade</p>
+                        </div>
+                        <p className="text-yellow-700 text-sm mt-1">
+                          Your instructor will review and grade your submission soon.
+                        </p>
                       </div>
                     )}
-                    
-                    <div className="mt-4">
-                      <p className="text-green-700 text-sm">
-                        You can resubmit by uploading a new file below. This will replace your current submission.
-                      </p>
-                    </div>
                   </div>
                 ) : (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">

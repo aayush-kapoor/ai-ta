@@ -391,9 +391,12 @@ export function AssignmentDetail() {
                               View File
                             </a>
                           )}
-                          <button className="px-3 py-2 text-pink-600 hover:text-pink-700 hover:bg-pink-50 rounded-lg transition-colors">
-                            Grade
-                          </button>
+                          <Link
+                            to={`/teacher/courses/${courseId}/assignments/${assignmentId}/submissions/${submission.id}`}
+                            className="px-3 py-2 text-pink-600 hover:text-pink-700 hover:bg-pink-50 rounded-lg transition-colors"
+                          >
+                            {submission.grade !== null ? 'View Grade' : 'Grade'}
+                          </Link>
                         </div>
                       </div>
                     </div>
