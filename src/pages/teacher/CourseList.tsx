@@ -74,22 +74,26 @@ export function CourseList() {
                   <h3 className="text-lg font-semibold text-gray-900 group-hover:text-pink-600 transition-colors">
                     {course.title}
                   </h3>
-                  <p className="text-sm text-gray-600 font-medium">{course.course_code}</p>
+                  <p className="text-sm text-gray-500">
+                    Created {new Date(course.created_at).toLocaleDateString()}
+                  </p>
                 </div>
                 <BookOpen className="w-6 h-6 text-pink-500" />
               </div>
               
-              <p className="text-gray-600 text-sm mb-4 line-clamp-2">{course.description}</p>
+              {course.description && (
+                <p className="text-gray-600 text-sm mb-4 line-clamp-2">{course.description}</p>
+              )}
               
               <div className="flex items-center justify-between text-sm text-gray-500">
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-1">
                     <Users className="w-4 h-4" />
-                    <span>45 students</span>
+                    <span>Students</span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <FileText className="w-4 h-4" />
-                    <span>12 assignments</span>
+                    <span>Assignments</span>
                   </div>
                 </div>
                 <span className="text-pink-600 font-medium">View →</span>

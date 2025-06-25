@@ -6,6 +6,10 @@ import { Layout } from './components/Layout'
 import Login from './components/Login'
 import { TeacherDashboard } from './pages/teacher/TeacherDashboard'
 import { CourseList } from './pages/teacher/CourseList'
+import { CourseDetail } from './pages/teacher/CourseDetail'
+import { NewAssignment } from './pages/teacher/NewAssignment'
+import { EditAssignment } from './pages/teacher/EditAssignment'
+import { AssignmentDetail } from './pages/teacher/AssignmentDetail'
 import NewCourse from './pages/teacher/NewCourse'
 import { StudentDashboard } from './pages/student/StudentDashboard'
 import { StudentCourses } from './pages/student/StudentCourses'
@@ -60,6 +64,38 @@ function AppRoutes() {
         <ProtectedRoute role="teacher">
           <Layout>
             <NewCourse />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/teacher/courses/:courseId" element={
+        <ProtectedRoute role="teacher">
+          <Layout>
+            <CourseDetail />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/teacher/courses/:courseId/assignments/:assignmentId" element={
+        <ProtectedRoute role="teacher">
+          <Layout>
+            <AssignmentDetail />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/teacher/courses/:courseId/assignments/new" element={
+        <ProtectedRoute role="teacher">
+          <Layout>
+            <NewAssignment />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/teacher/courses/:courseId/assignments/:assignmentId/edit" element={
+        <ProtectedRoute role="teacher">
+          <Layout>
+            <EditAssignment />
           </Layout>
         </ProtectedRoute>
       } />

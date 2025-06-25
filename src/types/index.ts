@@ -29,6 +29,7 @@ export interface Assignment {
   due_date: string | null
   total_points: number
   status: AssignmentStatus
+  rubric_markdown?: string | null
   created_at: string
   updated_at: string
   course?: Course
@@ -72,6 +73,8 @@ export interface CreateAssignmentData {
   course_id: string
   due_date?: string
   total_points?: number
+  status?: AssignmentStatus
+  rubric_markdown?: string
 }
 
 export interface CreateSubmissionData {
@@ -108,4 +111,13 @@ export interface AIGradingResult {
     feedback: string
   }[]
   overall_feedback: string
+}
+
+export interface UpdateAssignmentData {
+  title?: string
+  description?: string
+  due_date?: string
+  total_points?: number
+  status?: AssignmentStatus
+  rubric_markdown?: string
 }

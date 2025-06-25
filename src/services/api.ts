@@ -7,6 +7,7 @@ import {
   User,
   CreateCourseData, 
   CreateAssignmentData, 
+  UpdateAssignmentData,
   CreateSubmissionData, 
   UpdateSubmissionData, 
   GradeSubmissionData 
@@ -138,10 +139,25 @@ export const assignmentAPI = {
     return data
   },
 
-  async update(id: string, assignmentData: Partial<CreateAssignmentData>): Promise<Assignment> {
+  async update(id: string, assignmentData: Partial<UpdateAssignmentData>): Promise<Assignment> {
     const { data, error } = await supabase
       .from('assignments')
       .update({ ...assignmentData, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select(`
+        *,
+        course:courses(id, title, teacher_id)
+      `)
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  async updateRubric(id: string, rubric_markdown: string): Promise<Assignment> {
+    const { data, error } = await supabase
+      .from('assignments')
+      .update({ rubric_markdown, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select(`
         *,
