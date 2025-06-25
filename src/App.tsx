@@ -13,6 +13,8 @@ import { AssignmentDetail } from './pages/teacher/AssignmentDetail'
 import NewCourse from './pages/teacher/NewCourse'
 import { StudentDashboard } from './pages/student/StudentDashboard'
 import { StudentCourses } from './pages/student/StudentCourses'
+import { StudentCourseDetail } from './pages/student/StudentCourseDetail'
+import { StudentAssignmentView } from './pages/student/StudentAssignmentView'
 
 function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: 'teacher' | 'student' }) {
   const { user, loading } = useAuth()
@@ -113,6 +115,22 @@ function AppRoutes() {
         <ProtectedRoute role="student">
           <Layout>
             <StudentCourses />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/student/courses/:courseId" element={
+        <ProtectedRoute role="student">
+          <Layout>
+            <StudentCourseDetail />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/student/courses/:courseId/assignments/:assignmentId" element={
+        <ProtectedRoute role="student">
+          <Layout>
+            <StudentAssignmentView />
           </Layout>
         </ProtectedRoute>
       } />

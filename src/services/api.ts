@@ -111,6 +111,26 @@ export const assignmentAPI = {
     return data || []
   },
 
+  async getByStudentCourses(studentId: string): Promise<Assignment[]> {
+    const { data, error } = await supabase
+      .from('assignments')
+      .select(`
+        *,
+        course:courses!inner(
+          id, 
+          title, 
+          teacher_id,
+          enrollments!inner(student_id)
+        )
+      `)
+      .eq('course.enrollments.student_id', studentId)
+      .eq('status', 'published')
+      .order('due_date', { ascending: true })
+
+    if (error) throw error
+    return data || []
+  },
+
   async getById(id: string): Promise<Assignment | null> {
     const { data, error } = await supabase
       .from('assignments')

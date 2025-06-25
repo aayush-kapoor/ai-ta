@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { BookOpen, FileText, Clock, CheckCircle, Plus } from 'lucide-react'
 import { Assignment, Submission, Enrollment } from '../../types'
-import { enrollmentAPI, submissionAPI } from '../../services/api'
+import { enrollmentAPI, submissionAPI, assignmentAPI } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 
 export function StudentDashboard() {
@@ -18,15 +18,14 @@ export function StudentDashboard() {
       if (!user) return
 
       try {
-        const [enrollmentsData, submissionsData] = await Promise.all([
+        const [enrollmentsData, submissionsData, assignmentsData] = await Promise.all([
           enrollmentAPI.getByStudent(user.id),
-          submissionAPI.getByStudent(user.id)
+          submissionAPI.getByStudent(user.id),
+          assignmentAPI.getByStudentCourses(user.id)
         ])
         setEnrollments(enrollmentsData)
         setSubmissions(submissionsData)
-        
-        // For now, we'll skip assignments since we need to refactor how we get them
-        setAssignments([])
+        setAssignments(assignmentsData)
       } catch (error) {
         console.error('Error loading dashboard data:', error)
         toast.error('Failed to load dashboard data. Please refresh the page.')
@@ -143,18 +142,20 @@ export function StudentDashboard() {
           <div className="space-y-4">
             {upcomingAssignments.length > 0 ? (
               upcomingAssignments.map((assignment) => (
-                <div
+                <Link
                   key={assignment.id}
-                  className="flex items-center justify-between p-4 bg-pink-50 rounded-lg"
+                  to={`/student/courses/${assignment.course_id}/assignments/${assignment.id}`}
+                  className="flex items-center justify-between p-4 bg-pink-50 rounded-lg hover:bg-pink-100 transition-colors group"
                 >
                   <div>
-                    <h3 className="font-medium text-gray-900">{assignment.title}</h3>
+                    <h3 className="font-medium text-gray-900 group-hover:text-pink-700">{assignment.title}</h3>
                     <p className="text-sm text-gray-600">
                       Due: {new Date(assignment.due_date).toLocaleDateString()}
                     </p>
+                    <p className="text-xs text-gray-500">{assignment.course?.title}</p>
                   </div>
                   <Clock className="w-5 h-5 text-pink-600" />
-                </div>
+                </Link>
               ))
             ) : (
               <p className="text-gray-500 text-center py-8">No upcoming assignments</p>
