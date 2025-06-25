@@ -50,6 +50,9 @@ export interface Submission {
   student_id: string
   content: string | null
   file_url: string | null
+  file_path?: string | null // New: Storage path
+  file_size?: number | null // New: File size in bytes
+  original_filename?: string | null // New: Original filename
   status: SubmissionStatus
   grade: number | null
   feedback: string | null
@@ -79,14 +82,23 @@ export interface CreateAssignmentData {
 
 export interface CreateSubmissionData {
   assignment_id: string
+  student_id: string
   content?: string
   file_url?: string
+  file_path?: string
+  file_size?: number
+  original_filename?: string
+  status?: SubmissionStatus
 }
 
 export interface UpdateSubmissionData {
   content?: string
   file_url?: string
+  file_path?: string
+  file_size?: number
+  original_filename?: string
   status?: SubmissionStatus
+  submitted_at?: string
 }
 
 export interface GradeSubmissionData {

@@ -246,6 +246,22 @@ export const submissionAPI = {
     return data
   },
 
+  async getByStudentAndAssignment(studentId: string, assignmentId: string): Promise<Submission | null> {
+    const { data, error } = await supabase
+      .from('submissions')
+      .select(`
+        *,
+        assignment:assignments(id, title, course_id, total_points),
+        student:users!student_id(id, full_name, email)
+      `)
+      .eq('student_id', studentId)
+      .eq('assignment_id', assignmentId)
+      .maybeSingle()
+
+    if (error) throw error
+    return data
+  },
+
   async update(id: string, submissionData: UpdateSubmissionData): Promise<Submission> {
     const { data, error } = await supabase
       .from('submissions')
