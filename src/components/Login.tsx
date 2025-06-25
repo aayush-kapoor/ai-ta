@@ -34,8 +34,9 @@ export default function Login() {
   }
 
   const demoAccounts = [
-    { email: 'teacher@example.com', role: 'Teacher', name: 'Dr. Sarah Johnson' },
-    { email: 'student@example.com', role: 'Student', name: 'John Doe' },
+    { email: 'teacher@example.com', role: 'Teacher', name: 'Dr. Smith' },
+    { email: 'student@example.com', role: 'Student', name: 'Jane Doe' },
+    { email: 'student2@example.com', role: 'Student', name: 'John Doe' },
   ]
 
   return (
