@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { 
   BookOpen, 
@@ -22,6 +22,7 @@ export function CourseDetail() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingAssignment, setDeletingAssignment] = useState<string | null>(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     const loadCourseData = async () => {
@@ -199,17 +200,15 @@ export function CourseDetail() {
             {assignments.map((assignment) => (
               <div
                 key={assignment.id}
-                className="border border-gray-200 rounded-lg p-4 hover:border-pink-200 transition-colors"
+                className="border border-gray-200 rounded-lg p-4 hover:border-pink-200 transition-colors cursor-pointer group"
+                onClick={() => navigate(`/teacher/courses/${courseId}/assignments/${assignment.id}`)}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center space-x-3 mb-2">
-                      <Link
-                        to={`/teacher/courses/${courseId}/assignments/${assignment.id}`}
-                        className="text-lg font-medium text-gray-900 hover:text-pink-600 transition-colors"
-                      >
+                      <h3 className="text-lg font-medium text-gray-900 group-hover:text-pink-600 transition-colors">
                         {assignment.title}
-                      </Link>
+                      </h3>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(assignment.status)}`}>
                         {assignment.status}
                       </span>
@@ -236,6 +235,7 @@ export function CourseDetail() {
                     <Link
                       to={`/teacher/courses/${courseId}/assignments/${assignment.id}`}
                       className="flex items-center space-x-1 px-3 py-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <FileText className="w-4 h-4" />
                       <span className="text-sm">View</span>
@@ -243,12 +243,16 @@ export function CourseDetail() {
                     <Link
                       to={`/teacher/courses/${courseId}/assignments/${assignment.id}/edit`}
                       className="flex items-center space-x-1 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <Edit className="w-4 h-4" />
                       <span className="text-sm">Edit</span>
                     </Link>
                     <button
-                      onClick={() => handleDeleteAssignment(assignment.id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteAssignment(assignment.id)
+                      }}
                       disabled={deletingAssignment === assignment.id}
                       className="flex items-center space-x-1 px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                     >

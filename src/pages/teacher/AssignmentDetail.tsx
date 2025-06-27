@@ -358,12 +358,13 @@ export function AssignmentDetail() {
                   {submissions.map((submission) => (
                     <div
                       key={submission.id}
-                      className="border border-gray-200 rounded-lg p-4 hover:border-pink-200 transition-colors"
+                      className="border border-gray-200 rounded-lg p-4 hover:border-pink-200 transition-colors cursor-pointer group"
+                      onClick={() => navigate(`/teacher/courses/${courseId}/assignments/${assignmentId}/submissions/${submission.id}`)}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
-                            <h4 className="text-lg font-medium text-gray-900">
+                            <h4 className="text-lg font-medium text-gray-900 group-hover:text-pink-600 transition-colors">
                               {submission.student?.full_name || 'Unknown Student'}
                             </h4>
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSubmissionStatusColor(submission.status)}`}>
@@ -387,6 +388,7 @@ export function AssignmentDetail() {
                               target="_blank"
                               rel="noopener noreferrer"
                               className="px-3 py-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                              onClick={(e) => e.stopPropagation()}
                             >
                               View File
                             </a>
@@ -394,6 +396,7 @@ export function AssignmentDetail() {
                           <Link
                             to={`/teacher/courses/${courseId}/assignments/${assignmentId}/submissions/${submission.id}`}
                             className="px-3 py-2 text-pink-600 hover:text-pink-700 hover:bg-pink-50 rounded-lg transition-colors"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             {submission.grade !== null ? 'View Grade' : 'Grade'}
                           </Link>
