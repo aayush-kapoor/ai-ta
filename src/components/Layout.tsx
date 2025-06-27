@@ -2,6 +2,7 @@ import React from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { LogOut, BookOpen, User, Home } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
+import { ChatWidget } from './ChatWidget'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -83,6 +84,9 @@ export function Layout({ children }: LayoutProps) {
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {children}
       </main>
+
+      {/* Chat Widget - Only for teachers */}
+      <ChatWidget />
     </div>
   )
 }

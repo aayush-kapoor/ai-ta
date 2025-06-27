@@ -5,12 +5,14 @@ import {
   Submission, 
   Enrollment, 
   User,
+  ChatMessage,
   CreateCourseData, 
   CreateAssignmentData, 
   UpdateAssignmentData,
   CreateSubmissionData, 
   UpdateSubmissionData, 
-  GradeSubmissionData 
+  GradeSubmissionData,
+  CreateChatMessageData
 } from '../types'
 
 // Course API
@@ -390,9 +392,67 @@ export const userAPI = {
     const { data, error } = await supabase
       .from('users')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('full_name')
 
     if (error) throw error
     return data || []
+  }
+}
+
+// Chat API
+export const chatAPI = {
+  async getByUser(userId: string): Promise<ChatMessage[]> {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select(`
+        *,
+        user:users(id, full_name, email, role)
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+    return data || []
+  },
+
+  async create(messageData: CreateChatMessageData): Promise<ChatMessage> {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .insert([messageData])
+      .select(`
+        *,
+        user:users(id, full_name, email, role)
+      `)
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  async updateResponse(id: string, response: string): Promise<ChatMessage> {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .update({ 
+        response, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', id)
+      .select(`
+        *,
+        user:users(id, full_name, email, role)
+      `)
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('chat_messages')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
   }
 } 

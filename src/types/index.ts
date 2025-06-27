@@ -133,3 +133,19 @@ export interface UpdateAssignmentData {
   status?: AssignmentStatus
   rubric_markdown?: string
 }
+
+export interface ChatMessage {
+  id: string
+  user_id: string
+  message: string
+  response: string | null
+  created_at: string
+  updated_at: string
+  user?: User
+}
+
+export interface CreateChatMessageData {
+  user_id: string
+  message: string
+  response?: string
+}
