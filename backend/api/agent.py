@@ -21,12 +21,12 @@ action_handlers = ActionHandlers(supabase)
 @router.post("/process", response_model=AgentResponse)
 async def process_agent_request(
     request: AgentRequest,
-    user: dict = Depends(verify_auth_token),
+    user = Depends(verify_auth_token),
     authorization: str = Header(None)
 ):
     """Main endpoint for processing agent requests"""
     try:
-        logger.info(f"Processing request from user {user['id']}: {request.message}")
+        logger.info(f"Processing request from user {user.id}: {request.message}")
         
         # Extract the token from the authorization header
         user_token = None
@@ -36,7 +36,7 @@ async def process_agent_request(
         # Process message with Mylo to get intent and parameters
         intent_result = await mylo.process_message(
             message=request.message,
-            user_id=user["id"],
+            user_id=user.id,
             context=request.context
         )
         
@@ -54,7 +54,21 @@ async def process_agent_request(
         parameters = intent_result.get("parameters", {})
         
         logger.info(f"Executing action: {intent} with params: {parameters}")
-        action_result = await action_handlers.execute(intent, parameters, user["id"], user_token)
+        
+        # Handle conversational responses differently - use AI response directly
+        if intent == "conversation":
+            return AgentResponse(
+                response=intent_result.get("response", "Hello! I'm here to help with your teaching tasks."),
+                action_taken="conversation",
+                success=True,
+                data={
+                    "intent_analysis": intent_result,
+                    "type": "conversational"
+                }
+            )
+        
+        # For task-oriented intents, execute the action handler
+        action_result = await action_handlers.execute(intent, parameters, user.id, user_token)
         
         # Determine the final response
         if action_result["success"]:
@@ -116,6 +130,20 @@ async def test_agent_request(
         parameters = intent_result.get("parameters", {})
         
         logger.info(f"TEST: Executing action: {intent} with params: {parameters}")
+        
+        # Handle conversational responses differently - use AI response directly
+        if intent == "conversation":
+            return AgentResponse(
+                response=intent_result.get("response", "Hello! I'm here to help with your teaching tasks."),
+                action_taken="conversation",
+                success=True,
+                data={
+                    "intent_analysis": intent_result,
+                    "type": "conversational"
+                }
+            )
+        
+        # For task-oriented intents, execute the action handler
         action_result = await action_handlers.execute(intent, parameters, user["id"], None)
         
         # Determine the final response

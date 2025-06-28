@@ -104,4 +104,30 @@ async def list_all_data():
             "error": str(e),
             "courses": [],
             "assignments": []
+        }
+
+@router.get("/assignments")
+async def list_assignments():
+    """Debug endpoint to list all assignments"""
+    try:
+        from database import get_authenticated_client
+        
+        # Use service role to bypass RLS
+        admin_client = get_authenticated_client()
+        
+        # Get all assignments with course info
+        result = admin_client.table("assignments").select("id, title, total_points, status, course_id, courses(title)").execute()
+        assignments = result.data or []
+        
+        return {
+            "total_assignments": len(assignments),
+            "assignments": assignments,
+            "message": f"Found {len(assignments)} assignments in database"
+        }
+        
+    except Exception as e:
+        return {
+            "error": str(e),
+            "assignments": [],
+            "total_assignments": 0
         } 
