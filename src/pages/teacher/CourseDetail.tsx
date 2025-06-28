@@ -213,9 +213,9 @@ export function CourseDetail() {
                         {assignment.status}
                       </span>
                     </div>
-                    {assignment.description && (
+                    {/* {assignment.description && (
                       <p className="text-gray-600 mb-3">{assignment.description}</p>
-                    )}
+                    )} */}
                     <div className="flex items-center space-x-4 text-sm text-gray-500">
                       <div className="flex items-center space-x-1">
                         <Calendar className="w-4 h-4" />

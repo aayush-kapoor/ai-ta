@@ -132,7 +132,7 @@ export function StudentCourseDetail() {
                           <h4 className="text-lg font-semibold text-gray-900 group-hover:text-orange-600 transition-colors">
                             {assignment.title}
                           </h4>
-                          <p className="text-gray-600 text-sm mt-1 line-clamp-2">{assignment.description}</p>
+                          {/* <p className="text-gray-600 text-sm mt-1 line-clamp-2">{assignment.description}</p> */}
                           <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
                             <div className="flex items-center space-x-1">
                               <Calendar className="w-4 h-4" />
@@ -175,7 +175,7 @@ export function StudentCourseDetail() {
                           <h4 className="text-lg font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
                             {assignment.title}
                           </h4>
-                          <p className="text-gray-600 text-sm mt-1 line-clamp-2">{assignment.description}</p>
+                          {/* <p className="text-gray-600 text-sm mt-1 line-clamp-2">{assignment.description}</p> */}
                           <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
                             <div className="flex items-center space-x-1">
                               <Calendar className="w-4 h-4" />
