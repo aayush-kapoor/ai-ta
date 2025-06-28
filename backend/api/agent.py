@@ -33,10 +33,21 @@ async def process_agent_request(
         if authorization and authorization.startswith("Bearer "):
             user_token = authorization.split(" ")[1]
         
+        # Get thread history for context if thread_id is provided
+        thread_history = []
+        if request.thread_id:
+            try:
+                # Get previous messages in this thread for context
+                messages_result = supabase.table("chat_messages").select("message, response").eq("thread_id", request.thread_id).order("created_at", desc=False).execute()
+                thread_history = messages_result.data if messages_result.data else []
+            except Exception as e:
+                logger.warning(f"Could not fetch thread history: {e}")
+        
         # Process message with Mylo to get intent and parameters
         intent_result = await mylo.process_message(
             message=request.message,
             user_id=user.id,
+            thread_history=thread_history,
             context=request.context
         )
         
@@ -61,6 +72,7 @@ async def process_agent_request(
                 response=intent_result.get("response", "Hello! I'm here to help with your teaching tasks."),
                 action_taken="conversation",
                 success=True,
+                thread_id=request.thread_id,
                 data={
                     "intent_analysis": intent_result,
                     "type": "conversational"
@@ -82,6 +94,7 @@ async def process_agent_request(
             response=response_message,
             action_taken=intent,
             success=success,
+            thread_id=request.thread_id,
             data={
                 "intent_analysis": intent_result,
                 "action_result": action_result
@@ -94,6 +107,7 @@ async def process_agent_request(
             response="I encountered an error. Please try again.",
             action_taken="error",
             success=False,
+            thread_id=request.thread_id,
             data={"error": str(e)}
         )
 
@@ -109,10 +123,21 @@ async def test_agent_request(
         
         logger.info(f"TEST: Processing request from user {user['id']}: {request.message}")
         
+        # Get thread history for context if thread_id is provided
+        thread_history = []
+        if request.thread_id:
+            try:
+                # Get previous messages in this thread for context
+                messages_result = supabase.table("chat_messages").select("message, response").eq("thread_id", request.thread_id).order("created_at", desc=False).execute()
+                thread_history = messages_result.data if messages_result.data else []
+            except Exception as e:
+                logger.warning(f"Could not fetch thread history: {e}")
+        
         # Process message with Mylo to get intent and parameters
         intent_result = await mylo.process_message(
             message=request.message,
             user_id=user["id"],
+            thread_history=thread_history,
             context=request.context
         )
         
@@ -171,4 +196,66 @@ async def test_agent_request(
             action_taken="error",
             success=False,
             data={"error": str(e)}
-        ) 
+        )
+
+@router.post("/generate-thread-title")
+async def generate_thread_title(
+    request: dict,
+    user = Depends(verify_auth_token)
+):
+    """Generate a thread title based on first message exchange"""
+    try:
+        first_message = request.get("first_message", "")
+        first_response = request.get("first_response", "")
+        
+        if not first_message or not first_response:
+            return {"error": "Both first_message and first_response are required"}
+        
+        logger.info(f"Generating thread title for user {user.id}")
+        
+        # Use MyloAgent to generate the title
+        title = await mylo.generate_thread_title(first_message, first_response)
+        
+        return {
+            "success": True,
+            "title": title
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating thread title: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "title": " ".join(first_message.split()[:3])  # Fallback
+        }
+
+@router.post("/test/generate-thread-title")
+async def test_generate_thread_title(
+    request: dict,
+    user: dict = Depends(get_test_user)
+):
+    """Test endpoint for generating thread titles"""
+    try:
+        first_message = request.get("first_message", "")
+        first_response = request.get("first_response", "")
+        
+        if not first_message or not first_response:
+            return {"error": "Both first_message and first_response are required"}
+        
+        logger.info(f"TEST: Generating thread title for user {user['id']}")
+        
+        # Use MyloAgent to generate the title
+        title = await mylo.generate_thread_title(first_message, first_response)
+        
+        return {
+            "success": True,
+            "title": title
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating thread title: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "title": " ".join(first_message.split()[:3])  # Fallback
+        }

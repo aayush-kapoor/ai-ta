@@ -9,6 +9,7 @@ class AgentRequest(BaseModel):
     """Request model for agent endpoints"""
     message: str
     user_id: str
+    thread_id: Optional[str] = None
     context: Optional[Dict[str, Any]] = None
 
 class AgentResponse(BaseModel):
@@ -16,4 +17,6 @@ class AgentResponse(BaseModel):
     response: str
     action_taken: Optional[str] = None
     success: bool
+    thread_id: Optional[str] = None
+    thread_title: Optional[str] = None
     data: Optional[Dict[str, Any]] = None 

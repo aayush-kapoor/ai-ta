@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional, Callable
 from datetime import datetime, timedelta
 from supabase import Client
 from database import get_authenticated_client
+from .date_utils import process_date_expression
 
 logger = logging.getLogger(__name__)
 
@@ -135,24 +136,41 @@ class ActionHandlers:
             }
     
     async def _find_or_create_course(self, course_code: str, user_id: str, db_client: Client) -> Optional[str]:
-        """Find course by code or create it if it doesn't exist"""
+        """Find course by code or create it if it doesn't exist - uses intelligent matching"""
         try:
             logger.info(f"📚 FIND_OR_CREATE_COURSE: Looking for course '{course_code}' (using service role)")
             
-            # Try to find existing course
-            result = db_client.table("courses").select("id, teacher_id").eq("title", course_code).execute()
+            # Clean up the course name - remove "course" suffix and extra whitespace
+            cleaned_course_name = course_code.strip()
+            if cleaned_course_name.lower().endswith(" course"):
+                cleaned_course_name = cleaned_course_name[:-7].strip()  # Remove " course"
+            
+            logger.info(f"📚 FIND_OR_CREATE_COURSE: Cleaned course name: '{cleaned_course_name}'")
+            
+            # Try to find existing course using flexible matching (same as _find_course)
+            # First try exact match with cleaned name
+            result = db_client.table("courses").select("id, teacher_id, title").ilike("title", cleaned_course_name).execute()
+            
+            if not result.data:
+                # Try partial match
+                result = db_client.table("courses").select("id, teacher_id, title").ilike("title", f"%{cleaned_course_name}%").execute()
             
             if result.data:
-                course = result.data[0]
-                logger.info(f"📚 FIND_OR_CREATE_COURSE: Found existing course: {course['id']}")
-                return course["id"]
+                # Filter by teacher to ensure we only match courses owned by this user
+                user_courses = [course for course in result.data if course["teacher_id"] == user_id]
+                if user_courses:
+                    course = user_courses[0]  # Take the first match
+                    logger.info(f"📚 FIND_OR_CREATE_COURSE: Found existing course: '{course['title']}' (ID: {course['id']})")
+                    return course["id"]
+                else:
+                    logger.info(f"📚 FIND_OR_CREATE_COURSE: Found courses matching '{cleaned_course_name}' but none owned by user {user_id}")
             
-            # Create new course if not found
-            logger.info(f"📚 FIND_OR_CREATE_COURSE: Creating new course '{course_code}'")
+            # No existing course found, create new one using the cleaned name
+            logger.info(f"📚 FIND_OR_CREATE_COURSE: Creating new course '{cleaned_course_name}'")
             course_data = {
                 "id": str(uuid.uuid4()),
-                "title": course_code,
-                "description": f"Course {course_code}",
+                "title": cleaned_course_name,  # Use cleaned name
+                "description": f"Course {cleaned_course_name}",
                 "teacher_id": user_id,  # Associate with the requesting user
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat()
@@ -163,7 +181,7 @@ class ActionHandlers:
             
             if result.data:
                 course_id = result.data[0]["id"]
-                logger.info(f"📚 FIND_OR_CREATE_COURSE: Created new course: {course_code} (ID: {course_id})")
+                logger.info(f"📚 FIND_OR_CREATE_COURSE: Created new course: '{cleaned_course_name}' (ID: {course_id})")
                 return course_id
             else:
                 logger.error(f"📚 FIND_OR_CREATE_COURSE: Failed to create course - no data returned")
@@ -231,7 +249,7 @@ class ActionHandlers:
                 logger.info(f"🔧 UPDATE_ASSIGNMENT: Searching for assignments in course matching: '{course_keywords}'")
                 
                 # Find course by keywords
-                course = await self._find_course(course_keywords, db_client)
+                course = await self._find_course(course_keywords, db_client, user_id)
                 if course:
                     logger.info(f"🔧 UPDATE_ASSIGNMENT: Found course '{course['title']}', looking for assignments...")
                     
@@ -320,8 +338,10 @@ class ActionHandlers:
                 update_data["total_points"] = points
                 changes.append(f"points to {points}")
             if due_date:
-                update_data["due_date"] = due_date
-                changes.append(f"due date to {due_date}")
+                # Process natural language date expressions
+                processed_date = process_date_expression(due_date)
+                update_data["due_date"] = processed_date
+                changes.append(f"due date to {processed_date[:10]}")  # Show just the date part
             if status:
                 update_data["status"] = status
                 changes.append(f"status to {status}")
@@ -386,7 +406,8 @@ class ActionHandlers:
             if params.get("points"):
                 update_types.append(f"points to {params['points']}")
             if params.get("due_date"):
-                update_types.append(f"due date to {params['due_date']}")
+                processed_date = process_date_expression(params['due_date'])
+                update_types.append(f"due date to {processed_date[:10]}")
             if params.get("description"):
                 update_types.append("description")
             if params.get("status"):
@@ -556,7 +577,7 @@ class ActionHandlers:
                 logger.info(f"🗑️ DELETE_ASSIGNMENT: Searching for assignments in course matching: '{course_keywords}'")
                 
                 # Find course by keywords
-                course = await self._find_course(course_keywords, db_client)
+                course = await self._find_course(course_keywords, db_client, user_id)
                 if course:
                     logger.info(f"🗑️ DELETE_ASSIGNMENT: Found course '{course['title']}', looking for assignments...")
                     
@@ -703,7 +724,7 @@ class ActionHandlers:
                 logger.info(f"📊 GET_SUBMISSION_COUNT: Searching for assignments in course matching: '{course_keywords}'")
                 
                 # Find course by keywords
-                course = await self._find_course(course_keywords, db_client)
+                course = await self._find_course(course_keywords, db_client, user_id)
                 if course:
                     logger.info(f"📊 GET_SUBMISSION_COUNT: Found course '{course['title']}', looking for assignments...")
                     
@@ -947,7 +968,7 @@ class ActionHandlers:
                 }
             
             # Find course
-            course = await self._find_course(course_identifier, db_client)
+            course = await self._find_course(course_identifier, db_client, user_id)
             if not course:
                 return {
                     "success": False,
@@ -1037,7 +1058,7 @@ class ActionHandlers:
                     logger.info(f"🔍 FIND_ASSIGNMENT: Searching for assignments in course matching: '{course_keywords}'")
                     
                     # Find course by the extracted keywords
-                    course = await self._find_course(course_keywords, db_client)
+                    course = await self._find_course(course_keywords, db_client, user_id)
                     if course:
                         logger.info(f"🔍 FIND_ASSIGNMENT: Found course '{course['title']}', looking for assignments...")
                         
@@ -1064,19 +1085,39 @@ class ActionHandlers:
             logger.error(f"🔍 FIND_ASSIGNMENT: Error finding assignment {identifier}: {e}")
             return None
     
-    async def _find_course(self, identifier: str, db_client: Client) -> Optional[Dict]:
+    async def _find_course(self, identifier: str, db_client: Client, user_id: str = None) -> Optional[Dict]:
         """Find course by ID or name"""
         try:
+            # Clean up the identifier - remove "course" suffix and extra whitespace
+            cleaned_identifier = identifier.strip()
+            if cleaned_identifier.lower().endswith(" course"):
+                cleaned_identifier = cleaned_identifier[:-7].strip()  # Remove " course"
+            
             # Try by ID first
             if len(identifier) == 36:  # UUID length
                 result = db_client.table("courses").select("*").eq("id", identifier).execute()
                 if result.data:
-                    return result.data[0]
+                    course = result.data[0]
+                    # If user_id provided, ensure course belongs to user
+                    if user_id and course.get("teacher_id") != user_id:
+                        return None
+                    return course
             
-            # Try by title (case insensitive)
-            result = db_client.table("courses").select("*").ilike("title", f"%{identifier}%").execute()
+            # Try exact match first with cleaned name
+            result = db_client.table("courses").select("*").ilike("title", cleaned_identifier).execute()
+            
+            if not result.data:
+                # Try partial match
+                result = db_client.table("courses").select("*").ilike("title", f"%{cleaned_identifier}%").execute()
+            
             if result.data:
-                return result.data[0]
+                # If user_id provided, filter to only courses owned by that user
+                if user_id:
+                    user_courses = [course for course in result.data if course.get("teacher_id") == user_id]
+                    if user_courses:
+                        return user_courses[0]  # Return first match
+                else:
+                    return result.data[0]  # Return first match
             
             return None
         except Exception as e:
@@ -1129,7 +1170,7 @@ class ActionHandlers:
                 logger.info(f"📢 PUBLISH_ASSIGNMENT: Searching for assignments in course matching: '{course_keywords}'")
                 
                 # Find course by keywords
-                course = await self._find_course(course_keywords, db_client)
+                course = await self._find_course(course_keywords, db_client, user_id)
                 if course:
                     logger.info(f"📢 PUBLISH_ASSIGNMENT: Found course '{course['title']}', looking for assignments...")
                     
@@ -1292,7 +1333,7 @@ class ActionHandlers:
             identifier = params.get("name") or params.get("id")
             
             if info_type == "course" and identifier:
-                course = await self._find_course(identifier, db_client)
+                course = await self._find_course(identifier, db_client, user_id)
                 if not course:
                     return {
                         "success": False,
