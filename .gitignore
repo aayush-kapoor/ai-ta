@@ -30,3 +30,5 @@ supabase
 
 aita
 backend/README_AGENT.md
+backend/main_old.py
+backend/main_new.py
