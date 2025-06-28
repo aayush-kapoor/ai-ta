@@ -149,3 +149,17 @@ export interface CreateChatMessageData {
   message: string
   response?: string
 }
+
+// Agent API types
+export interface AgentRequest {
+  message: string
+  user_id: string
+  context?: Record<string, unknown>
+}
+
+export interface AgentResponse {
+  response: string
+  action_taken?: string
+  success: boolean
+  data?: Record<string, unknown>
+}
