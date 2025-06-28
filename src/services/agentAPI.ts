@@ -3,7 +3,7 @@
  * Handles communication with the backend Mylo agent
  */
 import { buildApiUrl, API_CONFIG } from '../config/api'
-import { AgentRequest, AgentResponse } from '../types'
+import { AgentRequest, AgentResponse, GradingResult } from '../types'
 import { supabase } from '../lib/supabase'
 
 // Get auth token from current session
@@ -233,17 +233,102 @@ export const agentAPI = {
    */
   async checkBackendHealth(): Promise<boolean> {
     try {
-      const response = await fetch(buildApiUrl('/health'), {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-      
+      const response = await fetch(buildApiUrl('/health'))
       return response.ok
     } catch (error) {
-      console.error('Backend health check failed:', error)
+      console.warn('Backend health check failed:', error)
       return false
+    }
+  },
+
+  /**
+   * Auto-grade a student submission using Mylo's grading agent
+   */
+  async gradeSubmission(submissionId: string, assignmentId: string, courseId: string): Promise<GradingResult> {
+    const token = await getAuthToken()
+    
+    console.log('🎯 Auto-grading submission:', { 
+      submissionId, 
+      assignmentId, 
+      courseId,
+      hasToken: !!token,
+      endpoint: buildApiUrl('/api/agent/grade-submission')
+    })
+    
+    const requestData = {
+      submission_id: submissionId,
+      assignment_id: assignmentId,
+      course_id: courseId
+    }
+
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      }
+      
+      const response = await fetch(buildApiUrl('/api/agent/grade-submission'), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestData)
+      })
+
+      console.log('📥 Grading response status:', response.status, response.statusText)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('❌ Grading response error body:', errorText)
+        throw new Error(`Grading API error: ${response.status} ${response.statusText} - ${errorText}`)
+      }
+
+      const result: GradingResult = await response.json()
+      console.log('✅ Grading result:', result)
+      return result
+      
+    } catch (error) {
+      console.error('❌ Error auto-grading submission:', error)
+      
+      // Return error result
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred during auto-grading'
+      }
+    }
+  },
+
+  /**
+   * Auto-grade a student submission using test endpoint (for development)
+   */
+  async testGradeSubmission(submissionId: string, assignmentId: string, courseId: string): Promise<GradingResult> {
+    const requestData = {
+      submission_id: submissionId,
+      assignment_id: assignmentId,
+      course_id: courseId
+    }
+
+    try {
+      const response = await fetch(buildApiUrl('/api/agent/test/grade-submission'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+      })
+
+      if (!response.ok) {
+        throw new Error(`Test grading API error: ${response.status} ${response.statusText}`)
+      }
+
+      const result: GradingResult = await response.json()
+      return result
+      
+    } catch (error) {
+      console.error('Error test auto-grading submission:', error)
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred during test auto-grading'
+      }
     }
   }
 } 

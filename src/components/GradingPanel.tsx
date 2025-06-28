@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Save, Star, MessageSquare } from 'lucide-react'
 import { Submission } from '../types'
 
@@ -7,17 +7,31 @@ interface GradingPanelProps {
   maxPoints: number
   onGradeSubmit: (grade: number, feedback: string) => Promise<void>
   isSubmitting?: boolean
+  autoGradeResult?: {
+    grade: number
+    feedback: string
+  } | null
 }
 
 export function GradingPanel({ 
   submission, 
   maxPoints, 
   onGradeSubmit, 
-  isSubmitting = false 
+  isSubmitting = false,
+  autoGradeResult = null
 }: GradingPanelProps) {
   const [grade, setGrade] = useState<string>(submission.grade?.toString() || '')
   const [feedback, setFeedback] = useState(submission.feedback || '')
   const [hasChanges, setHasChanges] = useState(false)
+
+  // Update grade and feedback when auto-grade result is available
+  useEffect(() => {
+    if (autoGradeResult) {
+      setGrade(autoGradeResult.grade.toString())
+      setFeedback(autoGradeResult.feedback)
+      setHasChanges(true)
+    }
+  }, [autoGradeResult])
 
   const handleGradeChange = (value: string) => {
     setGrade(value)
@@ -173,12 +187,20 @@ export function GradingPanel({
         {/* Submit Button */}
         <div className="flex items-center justify-between pt-4 border-t border-gray-200">
           <div className="text-sm text-gray-600">
-            {hasChanges && <span className="text-orange-600">You have unsaved changes</span>}
+            {hasChanges && (
+              <span className="text-orange-600">
+                {autoGradeResult ? 'Auto-grade ready for review' : 'You have unsaved changes'}
+              </span>
+            )}
           </div>
           <button
             type="submit"
             disabled={isSubmitting || !isValidGrade || !hasChanges}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-pink-500 to-blue-500 text-white rounded-lg hover:from-pink-600 hover:to-blue-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+              autoGradeResult 
+                ? 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600' 
+                : 'bg-gradient-to-r from-pink-500 to-blue-500 hover:from-pink-600 hover:to-blue-600'
+            } text-white`}
           >
             {isSubmitting ? (
               <>
@@ -188,7 +210,12 @@ export function GradingPanel({
             ) : (
               <>
                 <Save className="w-4 h-4" />
-                <span>{submission.grade !== null ? 'Update Grade' : 'Submit Grade'}</span>
+                <span>
+                  {autoGradeResult 
+                    ? 'Submit Reviewed Grade' 
+                    : submission.grade !== null ? 'Update Grade' : 'Submit Grade'
+                  }
+                </span>
               </>
             )}
           </button>

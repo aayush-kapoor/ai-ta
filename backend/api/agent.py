@@ -1,22 +1,43 @@
 """
 Agent API endpoints for AI Teaching Assistant
-Handles main agent processing requests
+Handles main agent processing requests and auto-grading functionality
 """
 import logging
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
 from models import AgentRequest, AgentResponse
 from auth import verify_auth_token, get_test_user, ensure_test_user_exists
 from agent import MyloAgent, ActionHandlers
-from database import supabase
+from agent.grading_agent import GradingAgent
+from agent.pdf_processor import PDFProcessor
+from database import supabase, get_authenticated_client
+from config import SUPABASE_URL
+from pydantic import BaseModel
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 # Initialize router
 router = APIRouter()
 
-# Initialize agent and handlers
+# Initialize agents and handlers
 mylo = MyloAgent()
 action_handlers = ActionHandlers(supabase)
+grading_agent = GradingAgent()
+pdf_processor = PDFProcessor()
+
+# Grading request model
+class GradingRequest(BaseModel):
+    submission_id: str
+    assignment_id: str
+    course_id: str
+
+class GradingResponse(BaseModel):
+    success: bool
+    grade: Optional[float] = None
+    feedback: Optional[str] = None
+    confidence: Optional[float] = None
+    detailed_result: Optional[dict] = None
+    error: Optional[str] = None
 
 @router.post("/process", response_model=AgentResponse)
 async def process_agent_request(
@@ -259,3 +280,202 @@ async def test_generate_thread_title(
             "error": str(e),
             "title": " ".join(first_message.split()[:3])  # Fallback
         }
+
+@router.post("/grade-submission", response_model=GradingResponse)
+async def grade_submission(
+    request: GradingRequest,
+    user = Depends(verify_auth_token),
+    authorization: str = Header(None)
+):
+    """Auto-grade a student submission using Mylo's grading agent"""
+    try:
+        logger.info(f"Auto-grading request from user {user.id} for submission {request.submission_id}")
+        
+        # Verify user is a teacher and has access to this course
+        course_result = supabase.table("courses").select("*").eq("id", request.course_id).execute()
+        if not course_result.data or course_result.data[0]["teacher_id"] != user.id:
+            raise HTTPException(status_code=403, detail="Access denied: You are not the teacher of this course")
+        
+        # Get submission data using service role client (bypasses RLS after teacher verification)
+        admin_client = get_authenticated_client()  # Service role client
+        submission_result = admin_client.table("submissions").select(
+            "*, student:users(*), assignment:assignments(*)"
+        ).eq("id", request.submission_id).execute()
+        
+        if not submission_result.data:
+            raise HTTPException(status_code=404, detail="Submission not found")
+        
+        submission = submission_result.data[0]
+        assignment = submission["assignment"]
+        
+        # Verify assignment belongs to the course
+        if assignment["course_id"] != request.course_id:
+            raise HTTPException(status_code=400, detail="Assignment does not belong to the specified course")
+        
+        # Extract text from submission file
+        submission_text = None
+        
+        if submission.get("file_path"):
+            # Construct direct URL to Supabase Storage
+            try:
+                # Build the direct storage URL using environment variable
+                storage_base_url = f"{SUPABASE_URL}/storage/v1/object/assignment-files/"
+                file_url = storage_base_url + submission["file_path"]
+                
+                logger.info(f"Constructed file URL: {file_url}")
+                
+                # Extract text from the URL
+                submission_text = await pdf_processor.extract_text_from_url(file_url)
+                
+            except Exception as e:
+                logger.error(f"Error processing file via direct URL: {e}")
+                # Fall back to trying the file_url if available
+                if submission.get("file_url"):
+                    logger.info("Falling back to file_url extraction")
+                    submission_text = await pdf_processor.extract_text_from_url(submission["file_url"])
+        elif submission.get("file_url"):
+            # Try to extract from file_url (legacy submissions)
+            submission_text = await pdf_processor.extract_text_from_url(submission["file_url"])
+        elif submission.get("content"):
+            # Use text content directly
+            submission_text = submission["content"]
+        
+        if not submission_text:
+            return GradingResponse(
+                success=False,
+                error="Could not extract text content from submission. The file may be corrupted, encrypted, or in an unsupported format."
+            )
+        
+        # Prepare assignment details for grading
+        assignment_details = {
+            "title": assignment["title"],
+            "description": assignment.get("description", ""),
+            "total_points": assignment["total_points"]
+        }
+        
+        # Get rubric if available
+        rubric = assignment.get("rubric_markdown")
+        
+        # Grade the submission
+        grading_result = await grading_agent.grade_submission(
+            submission_content=submission_text,
+            assignment_details=assignment_details,
+            rubric=rubric,
+            max_points=assignment["total_points"]
+        )
+        
+        if grading_result["success"]:
+            return GradingResponse(
+                success=True,
+                grade=grading_result["grade"],
+                feedback=grading_result["feedback"],
+                confidence=grading_result.get("detailed_result", {}).get("confidence_level", 0.8),
+                detailed_result=grading_result.get("detailed_result")
+            )
+        else:
+            return GradingResponse(
+                success=False,
+                error=grading_result.get("error", "Unknown error occurred during grading")
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in auto-grading: {e}")
+        return GradingResponse(
+            success=False,
+            error=f"Internal server error: {str(e)}"
+        )
+
+@router.post("/test/grade-submission", response_model=GradingResponse)
+async def test_grade_submission(
+    request: GradingRequest,
+    user: dict = Depends(get_test_user)
+):
+    """Test endpoint for auto-grading without authentication"""
+    try:
+        await ensure_test_user_exists()
+        logger.info(f"TEST: Auto-grading request from user {user['id']} for submission {request.submission_id}")
+        
+        # Get submission data using service role client (simplified for testing)
+        admin_client = get_authenticated_client()  # Service role client
+        submission_result = admin_client.table("submissions").select(
+            "*, student:users(*), assignment:assignments(*)"
+        ).eq("id", request.submission_id).execute()
+        
+        if not submission_result.data:
+            return GradingResponse(
+                success=False,
+                error="Submission not found"
+            )
+        
+        submission = submission_result.data[0]
+        assignment = submission["assignment"]
+        
+        # Extract text from submission (for testing, we'll use a mock if extraction fails)
+        submission_text = None
+        
+        if submission.get("file_path"):
+            # Construct direct URL to Supabase Storage
+            try:
+                # Build the direct storage URL using environment variable
+                storage_base_url = f"{SUPABASE_URL}/storage/v1/object/assignment-files/"
+                file_url = storage_base_url + submission["file_path"]
+                
+                logger.info(f"TEST: Constructed file URL: {file_url}")
+                
+                # Extract text from the URL
+                submission_text = await pdf_processor.extract_text_from_url(file_url)
+                
+            except Exception as e:
+                logger.error(f"TEST: Error processing file via direct URL: {e}")
+                # Fall back to trying the file_url if available
+                if submission.get("file_url"):
+                    logger.info("TEST: Falling back to file_url extraction")
+                    submission_text = await pdf_processor.extract_text_from_url(submission["file_url"])
+        elif submission.get("file_url"):
+            submission_text = await pdf_processor.extract_text_from_url(submission["file_url"])
+        elif submission.get("content"):
+            submission_text = submission["content"]
+        
+        # For testing, use mock content if extraction fails
+        if not submission_text:
+            submission_text = "This is a mock submission content for testing the auto-grading functionality. The student has provided a comprehensive analysis of the topic with good supporting evidence."
+        
+        # Prepare assignment details
+        assignment_details = {
+            "title": assignment["title"],
+            "description": assignment.get("description", ""),
+            "total_points": assignment["total_points"]
+        }
+        
+        rubric = assignment.get("rubric_markdown")
+        
+        # Grade the submission
+        grading_result = await grading_agent.grade_submission(
+            submission_content=submission_text,
+            assignment_details=assignment_details,
+            rubric=rubric,
+            max_points=assignment["total_points"]
+        )
+        
+        if grading_result["success"]:
+            return GradingResponse(
+                success=True,
+                grade=grading_result["grade"],
+                feedback=grading_result["feedback"],
+                confidence=grading_result.get("detailed_result", {}).get("confidence_level", 0.8),
+                detailed_result=grading_result.get("detailed_result")
+            )
+        else:
+            return GradingResponse(
+                success=False,
+                error=grading_result.get("error", "Unknown error occurred during grading")
+            )
+        
+    except Exception as e:
+        logger.error(f"Error in test auto-grading: {e}")
+        return GradingResponse(
+            success=False,
+            error=f"Internal server error: {str(e)}"
+        )

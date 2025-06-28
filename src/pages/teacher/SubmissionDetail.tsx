@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, User, Calendar, Clock, CheckCircle, FileText } from 'lucide-react'
+import { ArrowLeft, User, Calendar, Clock, CheckCircle, FileText, Zap } from 'lucide-react'
 import { Submission, Assignment, Course } from '../../types'
 import { submissionAPI, assignmentAPI, courseAPI } from '../../services/api'
+import { agentAPI } from '../../services/agentAPI'
 import { PDFViewer } from '../../components/PDFViewer'
 import { GradingPanel } from '../../components/GradingPanel'
 import { useAuth } from '../../contexts/AuthContext'
@@ -21,6 +22,11 @@ export function SubmissionDetail() {
   const [course, setCourse] = useState<Course | null>(null)
   const [loading, setLoading] = useState(true)
   const [grading, setGrading] = useState(false)
+  const [autoGrading, setAutoGrading] = useState(false)
+  const [autoGradeResult, setAutoGradeResult] = useState<{
+    grade: number
+    feedback: string
+  } | null>(null)
 
   useEffect(() => {
     const loadSubmissionData = async () => {
@@ -66,12 +72,46 @@ export function SubmissionDetail() {
       })
       setSubmission(updatedSubmission)
       toast.success('Grade submitted successfully!')
+      // Clear auto-grade result after manual submission
+      setAutoGradeResult(null)
     } catch (error) {
       console.error('Error grading submission:', error)
       toast.error('Failed to submit grade. Please try again.')
       throw error
     } finally {
       setGrading(false)
+    }
+  }
+
+  const handleAutoGrade = async () => {
+    if (!submission || !assignment || !course) return
+
+    setAutoGrading(true)
+    try {
+      toast.info('Starting auto-grading with Mylo...')
+      
+      // Call the auto-grading API
+      const result = await agentAPI.gradeSubmission(
+        submission.id,
+        assignment.id,
+        course.id
+      )
+      
+      if (result.success && result.grade !== undefined && result.feedback) {
+        setAutoGradeResult({
+          grade: result.grade,
+          feedback: result.feedback
+        })
+        toast.success('Auto-grading completed!')
+      } else {
+        throw new Error(result.error || 'Failed to auto-grade submission')
+      }
+      
+    } catch (error) {
+      console.error('Error auto-grading submission:', error)
+      toast.error(`Failed to auto-grade: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setAutoGrading(false)
     }
   }
 
@@ -114,7 +154,7 @@ export function SubmissionDetail() {
         </button>
         <div className="flex-1">
           <div className="flex items-center space-x-2 text-sm text-gray-600 mb-1">
-            <span>{course.course_code}</span>
+            <span>{course.title}</span>
             <span>•</span>
             <span>{assignment.title}</span>
           </div>
@@ -179,10 +219,85 @@ export function SubmissionDetail() {
         {/* PDF Viewer */}
         <div className="xl:col-span-2">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center space-x-2 mb-6">
-              <FileText className="w-5 h-5 text-gray-600" />
-              <h3 className="text-lg font-semibold text-gray-900">Submission File</h3>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-2">
+                <FileText className="w-5 h-5 text-gray-600" />
+                <h3 className="text-lg font-semibold text-gray-900">Submission File</h3>
+              </div>
+              
+              {/* Grade with Mylo Button */}
+              {submission.file_path && !autoGradeResult && (
+                <button
+                  onClick={handleAutoGrade}
+                  disabled={autoGrading}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {autoGrading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Grading with Mylo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4" />
+                      <span>Grade with Mylo</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
+
+            {/* Auto-Grade Result Display */}
+            {autoGradeResult && (
+              <div className="mb-6 bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-xl p-6">
+                <div className="flex items-center space-x-2 mb-4">
+                  <Zap className="w-5 h-5 text-purple-600" />
+                  <h4 className="text-lg font-semibold text-purple-800">Mylo's Auto-Grade</h4>
+                </div>
+                
+                <div className="grid md:grid-cols-2 gap-4 mb-4">
+                  <div className="bg-white rounded-lg p-4 border border-purple-200">
+                    <p className="text-sm text-purple-600 font-medium">Suggested Grade</p>
+                    <p className="text-2xl font-bold text-purple-800">
+                      {autoGradeResult.grade} / {assignment.total_points}
+                    </p>
+                    <p className="text-sm text-purple-600">
+                      ({Math.round((autoGradeResult.grade / assignment.total_points) * 100)}%)
+                    </p>
+                  </div>
+                  
+                  {/* <div className="bg-white rounded-lg p-4 border border-purple-200">
+                    <p className="text-sm text-purple-600 font-medium">AI Confidence</p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <div className="flex-1 bg-purple-100 rounded-full h-2">
+                        <div 
+                          className="bg-purple-600 h-2 rounded-full" 
+                          style={{ width: '85%' }}
+                        ></div>
+                      </div>
+                      <span className="text-sm font-medium text-purple-800">85%</span>
+                    </div>
+                  </div> */}
+                </div>
+                
+                <div className="bg-white rounded-lg p-4 border border-purple-200">
+                  <p className="text-sm text-purple-600 font-medium mb-2">AI Feedback</p>
+                  <p className="text-gray-700 text-sm leading-relaxed">{autoGradeResult.feedback}</p>
+                </div>
+                
+                <div className="flex items-center justify-between mt-4 pt-4 border-t border-purple-200">
+                  <p className="text-sm text-purple-600">
+                    Review and adjust the grade below, then submit your final grade.
+                  </p>
+                  <button
+                    onClick={() => setAutoGradeResult(null)}
+                    className="text-sm text-purple-600 hover:text-purple-800 font-medium"
+                  >
+                    Clear Auto-Grade
+                  </button>
+                </div>
+              </div>
+            )}
 
             {submission.file_path && submission.original_filename ? (
               <PDFViewer
@@ -230,6 +345,7 @@ export function SubmissionDetail() {
             maxPoints={assignment.total_points}
             onGradeSubmit={handleGradeSubmission}
             isSubmitting={grading}
+            autoGradeResult={autoGradeResult}
           />
         </div>
       </div>

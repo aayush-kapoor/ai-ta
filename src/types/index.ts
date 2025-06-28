@@ -125,6 +125,35 @@ export interface AIGradingResult {
   overall_feedback: string
 }
 
+export interface GradingResult {
+  success: boolean
+  grade?: number
+  feedback?: string
+  confidence?: number
+  detailed_result?: {
+    grade: number
+    percentage: number
+    feedback: {
+      overall: string
+      strengths?: string[]
+      areas_for_improvement?: string[]
+      specific_comments?: {
+        section: string
+        comment: string
+      }[]
+    }
+    rubric_breakdown?: {
+      criteria: string
+      points_earned: number
+      max_points: number
+      justification: string
+    }[]
+    confidence_level: number
+    recommendations?: string[]
+  }
+  error?: string
+}
+
 export interface UpdateAssignmentData {
   title?: string
   description?: string
