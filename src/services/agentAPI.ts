@@ -60,7 +60,7 @@ export const agentAPI = {
   /**
    * Send message to AI agent for processing
    */
-  async sendMessage(message: string, userId: string, context?: Record<string, unknown>): Promise<AgentResponse> {
+  async sendMessage(message: string, userId: string, threadId?: string, context?: Record<string, unknown>): Promise<AgentResponse> {
     const token = await getAuthToken()
     
     console.log('🚀 Sending message to agent:', { 
@@ -73,6 +73,7 @@ export const agentAPI = {
     const requestData: AgentRequest = {
       message,
       user_id: userId,
+      thread_id: threadId,
       context
     }
 
@@ -119,10 +120,11 @@ export const agentAPI = {
   /**
    * Send test message (for development)
    */
-  async sendTestMessage(message: string, userId: string, context?: Record<string, unknown>): Promise<AgentResponse> {
+  async sendTestMessage(message: string, userId: string, threadId?: string, context?: Record<string, unknown>): Promise<AgentResponse> {
     const requestData: AgentRequest = {
       message,
       user_id: userId,
+      thread_id: threadId,
       context
     }
 
@@ -151,6 +153,78 @@ export const agentAPI = {
         action_taken: "error",
         data: { error: error instanceof Error ? error.message : 'Unknown error' }
       }
+    }
+  },
+
+  /**
+   * Generate thread title using backend MyloAgent and OpenAI
+   */
+  async generateThreadTitle(firstMessage: string, firstResponse: string): Promise<string> {
+    const token = await getAuthToken()
+    
+         console.log('🎯 Generating thread title using MyloAgent:', { 
+       firstMessage: firstMessage.substring(0, 50) + '...', 
+       hasToken: !!token,
+       endpoint: buildApiUrl('/api/agent/generate-thread-title')
+     })
+    
+    const requestData = {
+      first_message: firstMessage,
+      first_response: firstResponse
+    }
+
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      }
+      
+             const response = await fetch(buildApiUrl('/api/agent/generate-thread-title'), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestData)
+      })
+
+      if (!response.ok) {
+        console.warn('❌ Failed to generate title via backend, using fallback')
+        // Fallback to simple client-side generation
+        return firstMessage.split(' ').slice(0, 3).join(' ')
+      }
+
+      const result = await response.json()
+      
+      if (result.success && result.title) {
+        console.log('✅ Generated title via MyloAgent:', result.title)
+        return result.title
+      } else {
+        console.warn('❌ Backend returned error:', result.error)
+        return result.title || firstMessage.split(' ').slice(0, 3).join(' ')
+      }
+      
+    } catch (error) {
+      console.error('❌ Error calling backend title generation:', error)
+      
+      // Fallback to test endpoint
+      try {
+          const testResponse = await fetch(buildApiUrl('/api/agent/test/generate-thread-title'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestData)
+        })
+        
+        if (testResponse.ok) {
+          const testResult = await testResponse.json()
+          if (testResult.success && testResult.title) {
+            console.log('✅ Generated title via test endpoint:', testResult.title)
+            return testResult.title
+          }
+        }
+      } catch (testError) {
+        console.error('❌ Test endpoint also failed:', testError)
+      }
+      
+      // Final fallback
+      return firstMessage.split(' ').slice(0, 3).join(' ')
     }
   },
 

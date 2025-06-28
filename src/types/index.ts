@@ -134,17 +134,36 @@ export interface UpdateAssignmentData {
   rubric_markdown?: string
 }
 
+export interface ChatThread {
+  id: string
+  user_id: string
+  title: string
+  created_at: string
+  updated_at: string
+  message_count: number
+  last_message_at: string | null
+  user?: User
+}
+
 export interface ChatMessage {
   id: string
+  thread_id: string
   user_id: string
   message: string
   response: string | null
   created_at: string
   updated_at: string
   user?: User
+  thread?: ChatThread
+}
+
+export interface CreateChatThreadData {
+  user_id: string
+  title: string
 }
 
 export interface CreateChatMessageData {
+  thread_id: string
   user_id: string
   message: string
   response?: string
@@ -154,6 +173,7 @@ export interface CreateChatMessageData {
 export interface AgentRequest {
   message: string
   user_id: string
+  thread_id?: string
   context?: Record<string, unknown>
 }
 
@@ -161,5 +181,7 @@ export interface AgentResponse {
   response: string
   action_taken?: string
   success: boolean
+  thread_id?: string
+  thread_title?: string
   data?: Record<string, unknown>
 }

@@ -6,13 +6,15 @@ import {
   Enrollment, 
   User,
   ChatMessage,
+  ChatThread,
   CreateCourseData, 
   CreateAssignmentData, 
   UpdateAssignmentData,
   CreateSubmissionData, 
   UpdateSubmissionData, 
   GradeSubmissionData,
-  CreateChatMessageData
+  CreateChatMessageData,
+  CreateChatThreadData
 } from '../types'
 
 // Course API
@@ -399,14 +401,131 @@ export const userAPI = {
   }
 }
 
+// Chat Thread API
+export const chatThreadAPI = {
+  async getByUser(userId: string): Promise<ChatThread[]> {
+    const { data, error } = await supabase
+      .from('chat_threads')
+      .select(`
+        *,
+        user:users(id, full_name, email, role)
+      `)
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+
+    if (error) throw error
+    return data || []
+  },
+
+  async create(threadData: CreateChatThreadData): Promise<ChatThread> {
+    const { data, error } = await supabase
+      .from('chat_threads')
+      .insert([{
+        ...threadData,
+        message_count: 0,
+        last_message_at: null
+      }])
+      .select(`
+        *,
+        user:users(id, full_name, email, role)
+      `)
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  async updateTitle(id: string, title: string): Promise<ChatThread> {
+    const { data, error } = await supabase
+      .from('chat_threads')
+      .update({ 
+        title, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', id)
+      .select(`
+        *,
+        user:users(id, full_name, email, role)
+      `)
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  async updateLastMessage(id: string): Promise<ChatThread> {
+    const { data, error } = await supabase
+      .from('chat_threads')
+      .update({ 
+        last_message_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select(`
+        *,
+        user:users(id, full_name, email, role)
+      `)
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  async incrementMessageCount(id: string): Promise<void> {
+    // Get current count and increment
+    const { data: thread, error: fetchError } = await supabase
+      .from('chat_threads')
+      .select('message_count')
+      .eq('id', id)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    const { error } = await supabase
+      .from('chat_threads')
+      .update({ 
+        message_count: (thread?.message_count || 0) + 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+
+    if (error) throw error
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('chat_threads')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+  }
+}
+
 // Chat API
 export const chatAPI = {
+  async getByThread(threadId: string): Promise<ChatMessage[]> {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select(`
+        *,
+        user:users(id, full_name, email, role),
+        thread:chat_threads(id, title, user_id)
+      `)
+      .eq('thread_id', threadId)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+    return data || []
+  },
+
   async getByUser(userId: string): Promise<ChatMessage[]> {
     const { data, error } = await supabase
       .from('chat_messages')
       .select(`
         *,
-        user:users(id, full_name, email, role)
+        user:users(id, full_name, email, role),
+        thread:chat_threads(id, title, user_id)
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: true })
@@ -421,11 +540,17 @@ export const chatAPI = {
       .insert([messageData])
       .select(`
         *,
-        user:users(id, full_name, email, role)
+        user:users(id, full_name, email, role),
+        thread:chat_threads(id, title, user_id)
       `)
       .single()
 
     if (error) throw error
+    
+    // Update thread's last message time and increment message count
+    await chatThreadAPI.updateLastMessage(messageData.thread_id)
+    await chatThreadAPI.incrementMessageCount(messageData.thread_id)
+    
     return data
   },
 
@@ -439,7 +564,8 @@ export const chatAPI = {
       .eq('id', id)
       .select(`
         *,
-        user:users(id, full_name, email, role)
+        user:users(id, full_name, email, role),
+        thread:chat_threads(id, title, user_id)
       `)
       .single()
 
