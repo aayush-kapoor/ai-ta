@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any
 class AgentRequest(BaseModel):
     """Request model for agent endpoints"""
     message: str
-    user_id: str
+    user_id: Optional[str] = None  # User ID comes from authentication, not request body
     thread_id: Optional[str] = None
     context: Optional[Dict[str, Any]] = None
 

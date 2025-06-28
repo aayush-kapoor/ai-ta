@@ -208,8 +208,10 @@ class ActionHandlers:
                 params.get("assignment_name") or 
                 params.get("title")  # LLM might put assignment name here
             )
+            course_name = params.get("course_name")
             
             logger.info(f"🔧 UPDATE_ASSIGNMENT: Assignment identifier: '{assignment_identifier}'")
+            logger.info(f"🔧 UPDATE_ASSIGNMENT: Course name: '{course_name}'")
             
             # For updates, separate the new title from the identifier
             new_title = params.get("new_title") or (params.get("title") if "assignment_name" in params or "assignment_id" in params else None)
@@ -220,36 +222,19 @@ class ActionHandlers:
             
             logger.info(f"🔧 UPDATE_ASSIGNMENT: Extracted values - new_title: {new_title}, points: {points}, description: {description}, due_date: {due_date}")
             
-            if not assignment_identifier:
-                logger.warning("🔧 UPDATE_ASSIGNMENT: No assignment identifier provided")
-                return {
-                    "success": False,
-                    "message": "I need an assignment name or course name to update assignments.",
-                    "data": None
-                }
+            assignment = None
             
-            # First, try to find assignment by direct name/ID
-            assignment = await self._find_assignment(assignment_identifier, db_client, user_id)
+            # First, try to find assignment by direct name/ID if provided
+            if assignment_identifier:
+                assignment = await self._find_assignment(assignment_identifier, db_client, user_id)
+                logger.info(f"🔧 UPDATE_ASSIGNMENT: Direct assignment search result: {'Found' if assignment else 'Not found'}")
             
-            if assignment:
-                # Found specific assignment, update it
-                logger.info(f"🔧 UPDATE_ASSIGNMENT: Found specific assignment: {assignment['title']}")
-                return await self._update_single_assignment(assignment, params, user_id, user_token)
-            
-            # If no direct assignment found, check if this might be a course-based request
-            logger.info(f"🔧 UPDATE_ASSIGNMENT: No direct assignment found, checking for course-based request...")
-            
-            # Extract course keywords from identifier
-            course_keywords = assignment_identifier.lower()
-            
-            # Remove common words that don't help identify the course
-            course_keywords = course_keywords.replace("assignment", "").replace("the", "").replace("in", "").replace("course", "").strip()
-            
-            if course_keywords:
-                logger.info(f"🔧 UPDATE_ASSIGNMENT: Searching for assignments in course matching: '{course_keywords}'")
+            # If no direct assignment found and course_name is provided, look for assignments in that course
+            if not assignment and course_name:
+                logger.info(f"🔧 UPDATE_ASSIGNMENT: No direct assignment found, searching in course '{course_name}'")
                 
-                # Find course by keywords
-                course = await self._find_course(course_keywords, db_client, user_id)
+                # Find course by name
+                course = await self._find_course(course_name, db_client, user_id)
                 if course:
                     logger.info(f"🔧 UPDATE_ASSIGNMENT: Found course '{course['title']}', looking for assignments...")
                     
@@ -266,29 +251,50 @@ class ActionHandlers:
                             "data": None
                         }
                     elif len(assignments) == 1:
-                        # Single assignment - update it
+                        # Single assignment - use it
                         assignment = assignments[0]
-                        logger.info(f"🔧 UPDATE_ASSIGNMENT: Updating single assignment '{assignment['title']}' in course '{course['title']}'")
-                        result = await self._update_single_assignment(assignment, params, user_id, user_token)
-                        
-                        # Enhance the message to mention the course context
-                        if result["success"]:
-                            result["message"] = result["message"].replace("assignment", f"assignment in course '{course['title']}'")
-                        
-                        return result
+                        logger.info(f"🔧 UPDATE_ASSIGNMENT: Using single assignment '{assignment['title']}' in course '{course['title']}'")
                     else:
-                        # Multiple assignments - update all of them
-                        logger.info(f"🔧 UPDATE_ASSIGNMENT: Updating {len(assignments)} assignments in course '{course['title']}'")
-                        return await self._update_multiple_assignments(assignments, params, course['title'], user_id, user_token)
+                        # Multiple assignments - ask for clarification
+                        logger.info(f"🔧 UPDATE_ASSIGNMENT: Multiple assignments found in course '{course['title']}'")
+                        assignment_titles = [a['title'] for a in assignments]
+                        return {
+                            "success": False,
+                            "message": f"I found {len(assignments)} assignments in course '{course['title']}': {', '.join(assignment_titles)}. Please specify which assignment you want to update.",
+                            "data": {
+                                "course_title": course['title'],
+                                "assignments": assignment_titles,
+                                "action_needed": "Please specify the exact assignment name to update."
+                            }
+                        }
                 else:
-                    logger.warning(f"🔧 UPDATE_ASSIGNMENT: No course found matching '{course_keywords}'")
+                    logger.warning(f"🔧 UPDATE_ASSIGNMENT: No course found matching '{course_name}'")
             
-            # If we get here, nothing was found
-            return {
-                "success": False,
-                "message": f"I couldn't find any assignment or course matching '{assignment_identifier}'. Please provide a specific assignment name or course name.",
-                "data": None
-            }
+            # If still no assignment found
+            if not assignment:
+                if assignment_identifier and course_name:
+                    error_msg = f"I couldn't find assignment '{assignment_identifier}' or any assignments in course '{course_name}'."
+                elif assignment_identifier:
+                    error_msg = f"I couldn't find assignment '{assignment_identifier}'."
+                elif course_name:
+                    error_msg = f"I couldn't find course '{course_name}' or any assignments in it."
+                else:
+                    error_msg = "I need either an assignment name or course name to update an assignment."
+                
+                return {
+                    "success": False,
+                    "message": error_msg,
+                    "data": None
+                }
+            
+            # Update the assignment
+            result = await self._update_single_assignment(assignment, params, user_id, user_token)
+            
+            # Enhance success message with course context if applicable
+            if result["success"] and course_name:
+                result["message"] = result["message"].replace("assignment", f"assignment in course '{course_name}'")
+            
+            return result
             
         except Exception as e:
             logger.error(f"🔧 UPDATE_ASSIGNMENT: Exception occurred: {e}")
@@ -468,24 +474,82 @@ class ActionHandlers:
                 params.get("assignment_name") or 
                 params.get("title")
             )
+            course_name = params.get("course_name")
             rubric_text = params.get("rubric_text") or params.get("rubric")
             
             logger.info(f"🔧 UPDATE_RUBRIC: Extracted assignment_identifier: '{assignment_identifier}'")
+            logger.info(f"🔧 UPDATE_RUBRIC: Extracted course_name: '{course_name}'")
             logger.info(f"🔧 UPDATE_RUBRIC: Extracted rubric_text: '{rubric_text}'")
             
-            if not assignment_identifier or not rubric_text:
+            if not rubric_text:
                 return {
                     "success": False,
-                    "message": "I need both an assignment name and the new rubric content.",
+                    "message": "I need the new rubric content to update.",
                     "data": None
                 }
             
-            # Find assignment
-            assignment = await self._find_assignment(assignment_identifier, db_client, user_id)
+            assignment = None
+            
+            # First, try to find assignment by direct name/ID if provided
+            if assignment_identifier:
+                assignment = await self._find_assignment(assignment_identifier, db_client, user_id)
+                logger.info(f"🔧 UPDATE_RUBRIC: Direct assignment search result: {'Found' if assignment else 'Not found'}")
+            
+            # If no direct assignment found and course_name is provided, look for assignments in that course
+            if not assignment and course_name:
+                logger.info(f"🔧 UPDATE_RUBRIC: No direct assignment found, searching in course '{course_name}'")
+                
+                # Find course by name
+                course = await self._find_course(course_name, db_client, user_id)
+                if course:
+                    logger.info(f"🔧 UPDATE_RUBRIC: Found course '{course['title']}', looking for assignments...")
+                    
+                    # Get all assignments in this course
+                    assignments_result = db_client.table("assignments").select("*").eq("course_id", course["id"]).execute()
+                    assignments = assignments_result.data or []
+                    
+                    logger.info(f"🔧 UPDATE_RUBRIC: Found {len(assignments)} assignments in course '{course['title']}'")
+                    
+                    if not assignments:
+                        return {
+                            "success": False,
+                            "message": f"No assignments found in course '{course['title']}'.",
+                            "data": None
+                        }
+                    elif len(assignments) == 1:
+                        # Single assignment - use it
+                        assignment = assignments[0]
+                        logger.info(f"🔧 UPDATE_RUBRIC: Using single assignment '{assignment['title']}' in course '{course['title']}'")
+                    else:
+                        # Multiple assignments - ask for clarification
+                        logger.info(f"🔧 UPDATE_RUBRIC: Multiple assignments found in course '{course['title']}'")
+                        assignment_titles = [a['title'] for a in assignments]
+                        return {
+                            "success": False,
+                            "message": f"I found {len(assignments)} assignments in course '{course['title']}': {', '.join(assignment_titles)}. Please specify which assignment's rubric you want to update.",
+                            "data": {
+                                "course_title": course['title'],
+                                "assignments": assignment_titles,
+                                "action_needed": "Please specify the exact assignment name to update its rubric."
+                            }
+                        }
+                else:
+                    logger.warning(f"🔧 UPDATE_RUBRIC: No course found matching '{course_name}'")
+            
+            # If still no assignment found
             if not assignment:
+                if assignment_identifier and course_name:
+                    error_msg = f"I couldn't find assignment '{assignment_identifier}' or any assignments in course '{course_name}'."
+                elif assignment_identifier:
+                    error_msg = f"I couldn't find assignment '{assignment_identifier}'."
+                elif course_name:
+                    error_msg = f"I couldn't find course '{course_name}' or any assignments in it."
+                else:
+                    error_msg = "I need either an assignment name or course name to update a rubric."
+                
                 return {
                     "success": False,
-                    "message": f"I couldn't find assignment '{assignment_identifier}'.",
+                    "message": error_msg,
                     "data": None
                 }
             
@@ -510,13 +574,20 @@ class ActionHandlers:
             result = admin_client.table("assignments").update(update_data).eq("id", assignment["id"]).execute()
             
             if result.data and len(result.data) > 0:
+                # Create enhanced success message with course context if applicable
+                success_message = f"✅ Updated rubric for assignment '{assignment['title']}'"
+                if course_name:
+                    success_message += f" in course '{course_name}'"
+                success_message += "!"
+                
                 return {
                     "success": True,
-                    "message": f"✅ Updated rubric for assignment '{assignment['title']}'!",
+                    "message": success_message,
                     "data": {
                         "assignment_id": assignment["id"],
                         "assignment_title": assignment["title"],
-                        "new_rubric": rubric_text
+                        "new_rubric": rubric_text,
+                        "course_context": course_name if course_name else None
                     }
                 }
             else:
@@ -548,36 +619,24 @@ class ActionHandlers:
                 params.get("assignment_name") or 
                 params.get("title")
             )
+            course_name = params.get("course_name")
             
             logger.info(f"🗑️ DELETE_ASSIGNMENT: Assignment identifier: '{assignment_identifier}'")
+            logger.info(f"🗑️ DELETE_ASSIGNMENT: Course name: '{course_name}'")
             
-            if not assignment_identifier:
-                return {
-                    "success": False,
-                    "message": "I need an assignment name or course name to delete assignments.",
-                    "data": None
-                }
+            assignment = None
             
-            # First, try to find assignment by direct name/ID
-            assignment = await self._find_assignment(assignment_identifier, db_client, user_id)
+            # First, try to find assignment by direct name/ID if provided
+            if assignment_identifier:
+                assignment = await self._find_assignment(assignment_identifier, db_client, user_id)
+                logger.info(f"🗑️ DELETE_ASSIGNMENT: Direct assignment search result: {'Found' if assignment else 'Not found'}")
             
-            if assignment:
-                # Found specific assignment, delete it
-                logger.info(f"🗑️ DELETE_ASSIGNMENT: Found specific assignment: {assignment['title']}")
-                return await self._delete_single_assignment(assignment, user_id, user_token)
-            
-            # If no direct assignment found, check if this might be a course-based request
-            logger.info(f"🗑️ DELETE_ASSIGNMENT: No direct assignment found, checking for course-based request...")
-            
-            # Extract course keywords from identifier
-            course_keywords = assignment_identifier.lower()
-            course_keywords = course_keywords.replace("assignment", "").replace("the", "").replace("in", "").replace("course", "").strip()
-            
-            if course_keywords:
-                logger.info(f"🗑️ DELETE_ASSIGNMENT: Searching for assignments in course matching: '{course_keywords}'")
+            # If no direct assignment found and course_name is provided, look for assignments in that course
+            if not assignment and course_name:
+                logger.info(f"🗑️ DELETE_ASSIGNMENT: No direct assignment found, searching in course '{course_name}'")
                 
-                # Find course by keywords
-                course = await self._find_course(course_keywords, db_client, user_id)
+                # Find course by name
+                course = await self._find_course(course_name, db_client, user_id)
                 if course:
                     logger.info(f"🗑️ DELETE_ASSIGNMENT: Found course '{course['title']}', looking for assignments...")
                     
@@ -594,18 +653,11 @@ class ActionHandlers:
                             "data": None
                         }
                     elif len(assignments) == 1:
-                        # Single assignment - delete it
+                        # Single assignment - use it
                         assignment = assignments[0]
-                        logger.info(f"🗑️ DELETE_ASSIGNMENT: Deleting single assignment '{assignment['title']}' in course '{course['title']}'")
-                        result = await self._delete_single_assignment(assignment, user_id, user_token)
-                        
-                        # Enhance the message to mention the course context
-                        if result["success"]:
-                            result["message"] = result["message"].replace("assignment", f"assignment in course '{course['title']}'")
-                        
-                        return result
+                        logger.info(f"🗑️ DELETE_ASSIGNMENT: Using single assignment '{assignment['title']}' in course '{course['title']}'")
                     else:
-                        # Multiple assignments - ask for confirmation or delete all
+                        # Multiple assignments - ask for clarification
                         logger.info(f"🗑️ DELETE_ASSIGNMENT: Multiple assignments found in course '{course['title']}'")
                         assignment_titles = [a['title'] for a in assignments]
                         return {
@@ -618,14 +670,33 @@ class ActionHandlers:
                             }
                         }
                 else:
-                    logger.warning(f"🗑️ DELETE_ASSIGNMENT: No course found matching '{course_keywords}'")
+                    logger.warning(f"🗑️ DELETE_ASSIGNMENT: No course found matching '{course_name}'")
             
-            # If we get here, nothing was found
-            return {
-                "success": False,
-                "message": f"I couldn't find any assignment or course matching '{assignment_identifier}'. Please provide a specific assignment name or course name.",
-                "data": None
-            }
+            # If still no assignment found
+            if not assignment:
+                if assignment_identifier and course_name:
+                    error_msg = f"I couldn't find assignment '{assignment_identifier}' or any assignments in course '{course_name}'."
+                elif assignment_identifier:
+                    error_msg = f"I couldn't find assignment '{assignment_identifier}'."
+                elif course_name:
+                    error_msg = f"I couldn't find course '{course_name}' or any assignments in it."
+                else:
+                    error_msg = "I need either an assignment name or course name to delete an assignment."
+                
+                return {
+                    "success": False,
+                    "message": error_msg,
+                    "data": None
+                }
+            
+            # Delete the assignment
+            result = await self._delete_single_assignment(assignment, user_id, user_token)
+            
+            # Enhance success message with course context if applicable
+            if result["success"] and course_name:
+                result["message"] = result["message"].replace("assignment", f"assignment in course '{course_name}'")
+            
+            return result
             
         except Exception as e:
             logger.error(f"🗑️ DELETE_ASSIGNMENT: Exception occurred: {e}")
@@ -695,36 +766,24 @@ class ActionHandlers:
                 params.get("assignment_name") or 
                 params.get("title")
             )
+            course_name = params.get("course_name")
             
             logger.info(f"📊 GET_SUBMISSION_COUNT: Assignment identifier: '{assignment_identifier}'")
+            logger.info(f"📊 GET_SUBMISSION_COUNT: Course name: '{course_name}'")
             
-            if not assignment_identifier:
-                return {
-                    "success": False,
-                    "message": "I need an assignment name or course name to check submission counts.",
-                    "data": None
-                }
+            assignment = None
             
-            # First, try to find assignment by direct name/ID
-            assignment = await self._find_assignment(assignment_identifier, db_client, user_id)
+            # First, try to find assignment by direct name/ID if provided
+            if assignment_identifier:
+                assignment = await self._find_assignment(assignment_identifier, db_client, user_id)
+                logger.info(f"📊 GET_SUBMISSION_COUNT: Direct assignment search result: {'Found' if assignment else 'Not found'}")
             
-            if assignment:
-                # Found specific assignment, get its submission count
-                logger.info(f"📊 GET_SUBMISSION_COUNT: Found specific assignment: {assignment['title']}")
-                return await self._get_single_assignment_submissions(assignment, user_id, user_token)
-            
-            # If no direct assignment found, check if this might be a course-based request
-            logger.info(f"📊 GET_SUBMISSION_COUNT: No direct assignment found, checking for course-based request...")
-            
-            # Extract course keywords from identifier
-            course_keywords = assignment_identifier.lower()
-            course_keywords = course_keywords.replace("assignment", "").replace("the", "").replace("in", "").replace("course", "").replace("submissions", "").replace("submission", "").strip()
-            
-            if course_keywords:
-                logger.info(f"📊 GET_SUBMISSION_COUNT: Searching for assignments in course matching: '{course_keywords}'")
+            # If no direct assignment found and course_name is provided, look for assignments in that course
+            if not assignment and course_name:
+                logger.info(f"📊 GET_SUBMISSION_COUNT: No direct assignment found, searching in course '{course_name}'")
                 
-                # Find course by keywords
-                course = await self._find_course(course_keywords, db_client, user_id)
+                # Find course by name
+                course = await self._find_course(course_name, db_client, user_id)
                 if course:
                     logger.info(f"📊 GET_SUBMISSION_COUNT: Found course '{course['title']}', looking for assignments...")
                     
@@ -741,29 +800,41 @@ class ActionHandlers:
                             "data": None
                         }
                     elif len(assignments) == 1:
-                        # Single assignment - get its submission count
+                        # Single assignment - use it
                         assignment = assignments[0]
-                        logger.info(f"📊 GET_SUBMISSION_COUNT: Getting submissions for single assignment '{assignment['title']}' in course '{course['title']}'")
-                        result = await self._get_single_assignment_submissions(assignment, user_id, user_token)
-                        
-                        # Enhance the message to mention the course context
-                        if result["success"]:
-                            result["message"] = result["message"].replace("assignment", f"assignment in course '{course['title']}'")
-                        
-                        return result
+                        logger.info(f"📊 GET_SUBMISSION_COUNT: Using single assignment '{assignment['title']}' in course '{course['title']}'")
                     else:
                         # Multiple assignments - get submission counts for all
                         logger.info(f"📊 GET_SUBMISSION_COUNT: Getting submissions for {len(assignments)} assignments in course '{course['title']}'")
                         return await self._get_multiple_assignment_submissions(assignments, course['title'], user_id, user_token)
                 else:
-                    logger.warning(f"📊 GET_SUBMISSION_COUNT: No course found matching '{course_keywords}'")
+                    logger.warning(f"📊 GET_SUBMISSION_COUNT: No course found matching '{course_name}'")
             
-            # If we get here, nothing was found
-            return {
-                "success": False,
-                "message": f"I couldn't find any assignment or course matching '{assignment_identifier}'. Please provide a specific assignment name or course name.",
-                "data": None
-            }
+            # If still no assignment found
+            if not assignment:
+                if assignment_identifier and course_name:
+                    error_msg = f"I couldn't find assignment '{assignment_identifier}' or any assignments in course '{course_name}'."
+                elif assignment_identifier:
+                    error_msg = f"I couldn't find assignment '{assignment_identifier}'."
+                elif course_name:
+                    error_msg = f"I couldn't find course '{course_name}' or any assignments in it."
+                else:
+                    error_msg = "I need either an assignment name or course name to check submission counts."
+                
+                return {
+                    "success": False,
+                    "message": error_msg,
+                    "data": None
+                }
+            
+            # Get submission count for the assignment
+            result = await self._get_single_assignment_submissions(assignment, user_id, user_token)
+            
+            # Enhance success message with course context if applicable
+            if result["success"] and course_name:
+                result["message"] = result["message"].replace("assignment", f"assignment in course '{course_name}'")
+            
+            return result
             
         except Exception as e:
             logger.error(f"📊 GET_SUBMISSION_COUNT: Exception occurred: {e}")
@@ -1138,39 +1209,26 @@ class ActionHandlers:
                 params.get("assignment_name") or 
                 params.get("title")
             )
+            course_name = params.get("course_name")
             action = params.get("action", "publish")  # publish or unpublish
             
-            logger.info(f"📢 PUBLISH_ASSIGNMENT: Assignment identifier: '{assignment_identifier}', Action: {action}")
+            logger.info(f"📢 PUBLISH_ASSIGNMENT: Assignment identifier: '{assignment_identifier}'")
+            logger.info(f"📢 PUBLISH_ASSIGNMENT: Course name: '{course_name}'")
+            logger.info(f"📢 PUBLISH_ASSIGNMENT: Action: {action}")
             
-            if not assignment_identifier:
-                return {
-                    "success": False,
-                    "message": "I need an assignment name or course name to publish/unpublish assignments.",
-                    "data": None
-                }
+            assignment = None
             
-            # First, try to find assignment by direct name/ID
-            assignment = await self._find_assignment(assignment_identifier, db_client, user_id)
+            # First, try to find assignment by direct name/ID if provided
+            if assignment_identifier:
+                assignment = await self._find_assignment(assignment_identifier, db_client, user_id)
+                logger.info(f"📢 PUBLISH_ASSIGNMENT: Direct assignment search result: {'Found' if assignment else 'Not found'}")
             
-            if assignment:
-                # Found specific assignment, publish it
-                logger.info(f"📢 PUBLISH_ASSIGNMENT: Found specific assignment: {assignment['title']}")
-                return await self._publish_single_assignment(assignment, action, db_client)
-            
-            # If no direct assignment found, check if this might be a course-based request
-            logger.info(f"📢 PUBLISH_ASSIGNMENT: No direct assignment found, checking for course-based request...")
-            
-            # Check if identifier contains course-related keywords
-            course_keywords = assignment_identifier.lower()
-            
-            # Remove common words that don't help identify the course
-            course_keywords = course_keywords.replace("assignment", "").replace("the", "").replace("in", "").replace("course", "").strip()
-            
-            if course_keywords:
-                logger.info(f"📢 PUBLISH_ASSIGNMENT: Searching for assignments in course matching: '{course_keywords}'")
+            # If no direct assignment found and course_name is provided, look for assignments in that course
+            if not assignment and course_name:
+                logger.info(f"📢 PUBLISH_ASSIGNMENT: No direct assignment found, searching in course '{course_name}'")
                 
-                # Find course by keywords
-                course = await self._find_course(course_keywords, db_client, user_id)
+                # Find course by name
+                course = await self._find_course(course_name, db_client, user_id)
                 if course:
                     logger.info(f"📢 PUBLISH_ASSIGNMENT: Found course '{course['title']}', looking for assignments...")
                     
@@ -1187,30 +1245,42 @@ class ActionHandlers:
                             "data": None
                         }
                     elif len(assignments) == 1:
-                        # Single assignment - publish it
+                        # Single assignment - use it
                         assignment = assignments[0]
-                        logger.info(f"📢 PUBLISH_ASSIGNMENT: Publishing single assignment '{assignment['title']}' in course '{course['title']}'")
-                        result = await self._publish_single_assignment(assignment, action, db_client)
-                        
-                        # Enhance the message to mention the course context
-                        if result["success"]:
-                            action_msg = "published" if action == "publish" else "unpublished"
-                            result["message"] = f"✅ Found and {action_msg} assignment '{assignment['title']}' in course '{course['title']}'!"
-                        
-                        return result
+                        logger.info(f"📢 PUBLISH_ASSIGNMENT: Using single assignment '{assignment['title']}' in course '{course['title']}'")
                     else:
                         # Multiple assignments - publish all of them
                         logger.info(f"📢 PUBLISH_ASSIGNMENT: Publishing {len(assignments)} assignments in course '{course['title']}'")
                         return await self._publish_multiple_assignments(assignments, action, course['title'], db_client)
                 else:
-                    logger.warning(f"📢 PUBLISH_ASSIGNMENT: No course found matching '{course_keywords}'")
+                    logger.warning(f"📢 PUBLISH_ASSIGNMENT: No course found matching '{course_name}'")
             
-            # If we get here, nothing was found
-            return {
-                "success": False,
-                "message": f"I couldn't find any assignment or course matching '{assignment_identifier}'. Please provide a specific assignment name or course name.",
-                "data": None
-            }
+            # If still no assignment found
+            if not assignment:
+                if assignment_identifier and course_name:
+                    error_msg = f"I couldn't find assignment '{assignment_identifier}' or any assignments in course '{course_name}'."
+                elif assignment_identifier:
+                    error_msg = f"I couldn't find assignment '{assignment_identifier}'."
+                elif course_name:
+                    error_msg = f"I couldn't find course '{course_name}' or any assignments in it."
+                else:
+                    error_msg = "I need either an assignment name or course name to publish/unpublish an assignment."
+                
+                return {
+                    "success": False,
+                    "message": error_msg,
+                    "data": None
+                }
+            
+            # Publish/unpublish the assignment
+            result = await self._publish_single_assignment(assignment, action, db_client)
+            
+            # Enhance success message with course context if applicable
+            if result["success"] and course_name:
+                action_msg = "published" if action == "publish" else "unpublished"
+                result["message"] = f"✅ Found and {action_msg} assignment '{assignment['title']}' in course '{course_name}'!"
+            
+            return result
                 
         except Exception as e:
             logger.error(f"📢 PUBLISH_ASSIGNMENT: Exception occurred: {e}")

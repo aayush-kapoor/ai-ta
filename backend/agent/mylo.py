@@ -99,6 +99,15 @@ class MyloAgent:
         - "final project assignment" → "final project"
         - "assignment homework 1" → "homework 1"
         
+        COURSE-BASED ASSIGNMENT PATTERNS (CRITICAL):
+        When users say "assignment in [COURSE]" or "the assignment in the [COURSE] course", extract as course_name instead of assignment_name:
+        - "edit the rubric of the assignment in the Machine Learning course" → course_name: "Machine Learning"
+        - "update the assignment in CS500" → course_name: "CS500" 
+        - "publish the assignment in the data science course" → course_name: "data science"
+        - "delete assignment in MATH101" → course_name: "MATH101"
+        
+        These patterns indicate the user wants to operate on assignments WITHIN a specific course, not on an assignment named after the course.
+        
         COURSE IDENTIFICATION:
         - "CS500", "MATH101", "course CS500" → course: "CS500"
         - "Machine Learning course" → course: "MACHINE LEARNING"
@@ -122,17 +131,20 @@ class MyloAgent:
         - "edit", "change", "update", "modify" → intent: update_assignment/update_course
 
         SMART COURSE-BASED ACTIONS:
-        When no specific assignment is mentioned but a course is referenced:
-        - "publish assignment in CS500" → publish_assignment(assignment_name: "assignment in CS500")
-        - "publish the data science course assignments" → publish_assignment(assignment_name: "data science course")
-        - "update points for machine learning course" → Look for assignments in that course
-        - "delete assignments in MATH101" → Handle course-based deletion
-        - "edit the rubric for the assignment in the data science course" → Look for assignments in the data science course
+        For requests like "assignment in [COURSE]", use course_name parameter instead of assignment_name:
+        - "edit rubric of assignment in Machine Learning course" → update_rubric(course_name: "Machine Learning", rubric_text: "...")
+        - "publish assignment in CS500" → publish_assignment(course_name: "CS500")
+        - "update points for assignment in data science course" → update_assignment(course_name: "data science", points: X)
+        - "delete assignment in MATH101" → delete_assignment(course_name: "MATH101")
+        - "how many submitted assignment in CS500" → get_submission_count(course_name: "CS500")
+        - "change points to 50 for assignment in machine learning course" → update_assignment(course_name: "machine learning", points: 50)
         
         The system will intelligently:
-        1. Try to find specific assignment first
-        2. If not found, extract course name and find assignments in that course
-        3. Take action on single assignment or multiple assignments as appropriate
+        1. Try to find specific assignment first by name/ID if provided
+        2. If course_name is provided, find assignments in that course
+        3. For single assignment: Take action automatically
+        4. For multiple assignments: Either take action on all (publish) or ask for clarification (update/delete)
+        5. Provide enhanced success messages with course context
         
         RUBRIC UPDATE EXAMPLES:
         - "update the rubric of the assignment Explore COVID-19 Data and Its Impact to say Good Documentation Needed" → update_rubric(assignment_name: "Explore COVID-19 Data and Its Impact", rubric_text: "Good Documentation Needed")
