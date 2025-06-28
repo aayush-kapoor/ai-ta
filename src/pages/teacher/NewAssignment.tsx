@@ -5,6 +5,7 @@ import { ArrowLeft, Calendar, Award, FileText, Clock } from 'lucide-react'
 import { Course, CreateAssignmentData, AssignmentStatus } from '../../types'
 import { courseAPI, assignmentAPI } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
+import { MarkdownEditor } from '../../components/MarkdownEditor'
 
 export function NewAssignment() {
   const { courseId } = useParams<{ courseId: string }>()
@@ -142,20 +143,25 @@ export function NewAssignment() {
           </div>
 
           {/* Description */}
-          <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-              Description
-            </label>
-            <textarea
-              id="description"
-              name="description"
-              rows={4}
-              value={formData.description}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-              placeholder="Provide assignment details, instructions, and requirements..."
-            />
-          </div>
+          <MarkdownEditor
+            value={formData.description}
+            onChange={(value) => setFormData(prev => ({ ...prev, description: value }))}
+            label="Assignment Description"
+            placeholder="Provide assignment details, instructions, and requirements using Markdown...
+
+## Instructions
+Explain what students need to do...
+
+## Requirements
+- List specific requirements
+- Include any constraints
+- Mention deliverables
+
+## Resources
+- [Helpful Link](https://example.com)
+- Additional materials needed"
+            rows={8}
+          />
 
           {/* Due Date and Points Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

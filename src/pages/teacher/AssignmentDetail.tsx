@@ -11,10 +11,14 @@ import {
   Clock,
   Edit,
   Save,
-  X
+  X,
+  Plus
 } from 'lucide-react'
 import { Assignment, Course, Submission } from '../../types'
 import { assignmentAPI, courseAPI, submissionAPI } from '../../services/api'
+import { useAuth } from '../../contexts/AuthContext'
+import { MarkdownViewer } from '../../components/MarkdownViewer'
+import { MarkdownEditor } from '../../components/MarkdownEditor'
 
 type TabType = 'info' | 'rubric' | 'submissions'
 
@@ -244,13 +248,10 @@ export function AssignmentDetail() {
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-3">Assignment Description</h3>
-                {assignment.description ? (
-                  <div className="prose max-w-none">
-                    <p className="text-gray-700 whitespace-pre-wrap">{assignment.description}</p>
-                  </div>
-                ) : (
-                  <p className="text-gray-500 italic">No description provided.</p>
-                )}
+                <MarkdownViewer 
+                  content={assignment.description}
+                  placeholder="No description provided."
+                />
               </div>
             </div>
           )}
@@ -272,16 +273,12 @@ export function AssignmentDetail() {
 
               {isEditingRubric ? (
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Rubric (Markdown Format)
-                    </label>
-                    <textarea
-                      value={rubricContent}
-                      onChange={(e) => setRubricContent(e.target.value)}
-                      rows={12}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent font-mono text-sm"
-                      placeholder="## Grading Criteria
+                  <MarkdownEditor
+                    value={rubricContent}
+                    onChange={setRubricContent}
+                    label="Grading Rubric"
+                    rows={12}
+                    placeholder="## Grading Criteria
 
 ### Code Quality (30 points)
 - Clean, readable code structure
@@ -297,8 +294,7 @@ export function AssignmentDetail() {
 - Clear README file
 - Inline code comments
 - Usage instructions"
-                    />
-                  </div>
+                  />
                   <div className="flex items-center space-x-3">
                     <button
                       onClick={handleSaveRubric}
@@ -320,11 +316,10 @@ export function AssignmentDetail() {
               ) : (
                 <div>
                   {assignment.rubric_markdown ? (
-                    <div className="prose max-w-none">
-                      <pre className="whitespace-pre-wrap font-sans text-gray-700 bg-gray-50 p-4 rounded-lg">
-                        {assignment.rubric_markdown}
-                      </pre>
-                    </div>
+                    <MarkdownViewer 
+                      content={assignment.rubric_markdown}
+                      placeholder="No rubric provided."
+                    />
                   ) : (
                     <div className="text-center py-8 bg-gray-50 rounded-lg">
                       <ClipboardList className="w-12 h-12 text-gray-400 mx-auto mb-4" />

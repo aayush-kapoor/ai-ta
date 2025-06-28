@@ -6,6 +6,7 @@ import { Assignment, Course, Submission } from '../../types'
 import { assignmentAPI, courseAPI, submissionAPI } from '../../services/api'
 import { fileUploadService } from '../../services/fileUpload'
 import { FileUpload } from '../../components/FileUpload'
+import { MarkdownViewer } from '../../components/MarkdownViewer'
 import { useAuth } from '../../contexts/AuthContext'
 
 type TabType = 'details' | 'rubric' | 'submit'
@@ -133,10 +134,10 @@ export function StudentAssignmentView() {
     )
   }
 
-  const dueDate = new Date(assignment.due_date)
+  const dueDate = assignment.due_date ? new Date(assignment.due_date) : null
   const now = new Date()
-  const isOverdue = dueDate < now
-  const daysUntilDue = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  const isOverdue = dueDate ? dueDate < now : false
+  const daysUntilDue = dueDate ? Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null
 
   const tabs = [
     { id: 'details' as TabType, label: 'Assignment Details', icon: FileText },
@@ -156,8 +157,6 @@ export function StudentAssignmentView() {
         </button>
         <div className="flex-1">
           <div className="flex items-center space-x-2 text-sm text-gray-600 mb-1">
-            <span>{course.course_code}</span>
-            <span>•</span>
             <span>{course.title}</span>
           </div>
           <h1 className="text-3xl font-bold text-gray-900">{assignment.title}</h1>
@@ -174,7 +173,7 @@ export function StudentAssignmentView() {
             <div>
               <p className="text-sm text-gray-600">Due Date</p>
               <p className="font-semibold text-gray-900">
-                {dueDate.toLocaleDateString()} at {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {dueDate ? `${dueDate.toLocaleDateString()} at ${dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'No due date set'}
               </p>
             </div>
           </div>
@@ -245,9 +244,10 @@ export function StudentAssignmentView() {
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
-                <div className="prose max-w-none text-gray-700">
-                  <p className="whitespace-pre-wrap">{assignment.description}</p>
-                </div>
+                <MarkdownViewer 
+                  content={assignment.description}
+                  placeholder="No description provided for this assignment."
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-200">
@@ -260,7 +260,7 @@ export function StudentAssignmentView() {
                     </div>
                     <div className="flex justify-between">
                       <span>Due Date:</span>
-                      <span className="font-medium">{dueDate.toLocaleDateString()}</span>
+                      <span className="font-medium">{dueDate ? dueDate.toLocaleDateString() : 'No due date'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Status:</span>
@@ -276,10 +276,7 @@ export function StudentAssignmentView() {
                       <span>Course:</span>
                       <span className="font-medium">{course.title}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Course Code:</span>
-                      <span className="font-medium">{course.course_code}</span>
-                    </div>
+
                     <div className="flex justify-between">
                       <span>Instructor:</span>
                       <span className="font-medium">{course.teacher?.full_name}</span>
@@ -293,18 +290,10 @@ export function StudentAssignmentView() {
           {activeTab === 'rubric' && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Grading Rubric</h3>
-              {assignment.rubric_markdown ? (
-                <div className="prose max-w-none">
-                  <div className="bg-gray-50 rounded-lg p-4 whitespace-pre-wrap text-gray-700">
-                    {assignment.rubric_markdown}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <CheckCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p>No rubric has been provided for this assignment.</p>
-                </div>
-              )}
+              <MarkdownViewer 
+                content={assignment.rubric_markdown}
+                placeholder="No rubric has been provided for this assignment."
+              />
             </div>
           )}
 
