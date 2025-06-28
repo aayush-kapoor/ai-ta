@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { Save, Star, MessageSquare } from 'lucide-react'
-import { Submission } from '../types'
+import { Submission, GradingResult } from '../types'
 
 interface GradingPanelProps {
   submission: Submission
   maxPoints: number
   onGradeSubmit: (grade: number, feedback: string) => Promise<void>
   isSubmitting?: boolean
-  autoGradeResult?: {
-    grade: number
-    feedback: string
-  } | null
+  autoGradeResult?: GradingResult | null
 }
 
 export function GradingPanel({ 
@@ -26,7 +23,7 @@ export function GradingPanel({
 
   // Update grade and feedback when auto-grade result is available
   useEffect(() => {
-    if (autoGradeResult) {
+    if (autoGradeResult && autoGradeResult.grade !== undefined && autoGradeResult.feedback !== undefined) {
       setGrade(autoGradeResult.grade.toString())
       setFeedback(autoGradeResult.feedback)
       setHasChanges(true)

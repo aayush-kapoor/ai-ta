@@ -135,21 +135,26 @@ export interface GradingResult {
     percentage: number
     feedback: {
       overall: string
-      strengths?: string[]
-      areas_for_improvement?: string[]
-      specific_comments?: {
+      strengths: string[]
+      areas_for_improvement: string[]
+      missing_elements: string[]
+      specific_comments: {
         section: string
         comment: string
+        points_awarded: number
+        points_possible: number
       }[]
     }
-    rubric_breakdown?: {
+    rubric_breakdown: {
       criteria: string
       points_earned: number
       max_points: number
       justification: string
+      found_in_submission: boolean
+      quality_assessment: string
     }[]
     confidence_level: number
-    recommendations?: string[]
+    recommendations: string[]
   }
   error?: string
 }
