@@ -58,14 +58,21 @@ export function SubmissionDetail() {
     loadSubmissionData()
   }, [submissionId, assignmentId, courseId, user, navigate])
 
-  const handleGradeSubmission = async (grade: number, feedback: string) => {
+  const handleGradeSubmission = async (
+    grade: number, 
+    feedback: string, 
+    showDetailedFeedback?: boolean, 
+    detailedFeedback?: GradingResult['detailed_result'] | null
+  ) => {
     if (!submission) return
 
     setGrading(true)
     try {
       const updatedSubmission = await submissionAPI.grade(submission.id, {
         grade,
-        feedback
+        feedback,
+        show_detailed_feedback: showDetailedFeedback || false,
+        detailed_feedback_json: detailedFeedback || null
       })
       setSubmission(updatedSubmission)
       toast.success('Grade submitted successfully!')

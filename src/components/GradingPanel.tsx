@@ -5,7 +5,7 @@ import { Submission, GradingResult } from '../types'
 interface GradingPanelProps {
   submission: Submission
   maxPoints: number
-  onGradeSubmit: (grade: number, feedback: string) => Promise<void>
+  onGradeSubmit: (grade: number, feedback: string, showDetailedFeedback?: boolean, detailedFeedback?: GradingResult['detailed_result'] | null) => Promise<void>
   isSubmitting?: boolean
   autoGradeResult?: GradingResult | null
 }
@@ -19,6 +19,7 @@ export function GradingPanel({
 }: GradingPanelProps) {
   const [grade, setGrade] = useState<string>(submission.grade?.toString() || '')
   const [feedback, setFeedback] = useState(submission.feedback || '')
+  const [showDetailedFeedback, setShowDetailedFeedback] = useState(submission.show_detailed_feedback || false)
   const [hasChanges, setHasChanges] = useState(false)
 
   // Update grade and feedback when auto-grade result is available
@@ -50,7 +51,12 @@ export function GradingPanel({
     }
 
     try {
-      await onGradeSubmit(gradeValue, feedback)
+      await onGradeSubmit(
+        gradeValue, 
+        feedback, 
+        showDetailedFeedback, 
+        autoGradeResult?.detailed_result || null
+      )
       setHasChanges(false)
     } catch (error) {
       console.error('Failed to submit grade:', error)
@@ -151,6 +157,34 @@ export function GradingPanel({
             placeholder="Provide feedback to help the student improve..."
             disabled={isSubmitting}
           />
+          
+          {/* Detailed Feedback Toggle */}
+          {autoGradeResult && autoGradeResult.detailed_result && (
+            <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="showDetailedFeedback"
+                  checked={showDetailedFeedback}
+                  onChange={(e) => {
+                    setShowDetailedFeedback(e.target.checked)
+                    setHasChanges(true)
+                  }}
+                  className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
+                  disabled={isSubmitting}
+                />
+                <label htmlFor="showDetailedFeedback" className="text-sm font-medium text-purple-800">
+                  Share detailed AI analysis with student
+                </label>
+              </div>
+              <p className="text-xs text-purple-600 mt-1">
+                {showDetailedFeedback 
+                  ? "Student will see the full AI breakdown (strengths, improvements, rubric analysis)" 
+                  : "Student will only see the basic feedback above"
+                }
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Current Grade Display */}

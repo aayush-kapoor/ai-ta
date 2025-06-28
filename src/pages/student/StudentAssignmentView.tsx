@@ -7,6 +7,7 @@ import { assignmentAPI, courseAPI, submissionAPI } from '../../services/api'
 import { fileUploadService } from '../../services/fileUpload'
 import { FileUpload } from '../../components/FileUpload'
 import { MarkdownViewer } from '../../components/MarkdownViewer'
+import { StudentDetailedFeedback } from '../../components/StudentDetailedFeedback'
 import { useAuth } from '../../contexts/AuthContext'
 
 type TabType = 'details' | 'rubric' | 'submit'
@@ -369,7 +370,15 @@ export function StudentAssignmentView() {
                           </div>
                         </div>
 
-                        {submission.feedback && (
+                        {/* Feedback Display - Detailed or Basic */}
+                        {submission.show_detailed_feedback && submission.detailed_feedback_json ? (
+                          <div className="mt-4">
+                            <StudentDetailedFeedback 
+                              detailedFeedback={submission.detailed_feedback_json}
+                              totalPoints={assignment.total_points}
+                            />
+                          </div>
+                        ) : submission.feedback && (
                           <div className="mt-4 bg-white rounded-lg border border-blue-200 p-4">
                             <h5 className="font-medium text-gray-900 mb-2">Instructor Feedback:</h5>
                             <p className="text-gray-700 whitespace-pre-wrap">{submission.feedback}</p>

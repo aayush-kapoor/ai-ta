@@ -56,6 +56,8 @@ export interface Submission {
   status: SubmissionStatus
   grade: number | null
   feedback: string | null
+  detailed_feedback_json?: GradingResult['detailed_result'] | null // New: Detailed AI feedback structure
+  show_detailed_feedback?: boolean // New: Toggle for detailed feedback visibility
   submitted_at: string | null
   graded_at: string | null
   created_at: string
@@ -104,6 +106,8 @@ export interface UpdateSubmissionData {
 export interface GradeSubmissionData {
   grade: number
   feedback?: string
+  show_detailed_feedback?: boolean
+  detailed_feedback_json?: GradingResult['detailed_result'] | null
 }
 
 export interface RubricItem {
