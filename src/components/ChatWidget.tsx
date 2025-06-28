@@ -57,7 +57,7 @@ export function ChatWidget() {
       // Create message without response first
       const savedMessage = await chatAPI.create({
         ...messageData,
-        response: null // No response initially
+        response: "" // No response initially
       })
       
       // Add user message immediately
