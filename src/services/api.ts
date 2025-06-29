@@ -287,7 +287,14 @@ export const submissionAPI = {
       .from('submissions')
       .select(`
         *,
-        assignment:assignments(id, title, course_id, total_points, due_date),
+        assignment:assignments(
+          id, 
+          title, 
+          course_id, 
+          total_points, 
+          due_date,
+          course:courses(id, title, description)
+        ),
         student:users!student_id(id, full_name, email)
       `)
       .eq('student_id', studentId)
@@ -303,7 +310,13 @@ export const submissionAPI = {
       .insert([submissionData])
       .select(`
         *,
-        assignment:assignments(id, title, course_id, total_points),
+        assignment:assignments(
+          id, 
+          title, 
+          course_id, 
+          total_points,
+          course:courses(id, title, description)
+        ),
         student:users!student_id(id, full_name, email)
       `)
       .single()
@@ -336,7 +349,13 @@ export const submissionAPI = {
       .from('submissions')
       .select(`
         *,
-        assignment:assignments(id, title, course_id, total_points),
+        assignment:assignments(
+          id, 
+          title, 
+          course_id, 
+          total_points,
+          course:courses(id, title, description)
+        ),
         student:users!student_id(id, full_name, email)
       `)
       .eq('student_id', studentId)
@@ -352,7 +371,13 @@ export const submissionAPI = {
       .from('submissions')
       .select(`
         *,
-        assignment:assignments(id, title, course_id, total_points),
+        assignment:assignments(
+          id, 
+          title, 
+          course_id, 
+          total_points,
+          course:courses(id, title, description)
+        ),
         student:users!student_id(id, full_name, email)
       `)
       .eq('id', id)
@@ -369,7 +394,13 @@ export const submissionAPI = {
       .eq('id', id)
       .select(`
         *,
-        assignment:assignments(id, title, course_id, total_points),
+        assignment:assignments(
+          id, 
+          title, 
+          course_id, 
+          total_points,
+          course:courses(id, title, description)
+        ),
         student:users!student_id(id, full_name, email)
       `)
       .single()
@@ -409,7 +440,13 @@ export const submissionAPI = {
       .eq('id', id)
       .select(`
         *,
-        assignment:assignments(id, title, course_id, total_points),
+        assignment:assignments(
+          id, 
+          title, 
+          course_id, 
+          total_points,
+          course:courses(id, title, description)
+        ),
         student:users!student_id(id, full_name, email)
       `)
       .single()

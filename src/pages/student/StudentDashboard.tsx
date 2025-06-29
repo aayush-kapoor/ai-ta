@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { BookOpen, FileText, Clock, CheckCircle, Plus } from 'lucide-react'
+import { BookOpen, FileText, Clock, Plus } from 'lucide-react'
 import { Assignment, Submission, Enrollment } from '../../types'
 import { enrollmentAPI, submissionAPI, assignmentAPI } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
@@ -47,15 +47,23 @@ export function StudentDashboard() {
 
   const upcomingAssignments = assignments
     .filter(assignment => {
+      if (!assignment.due_date) return false
       const dueDate = new Date(assignment.due_date)
       const now = new Date()
       return dueDate > now
     })
-    .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+    .sort((a, b) => {
+      if (!a.due_date || !b.due_date) return 0
+      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+    })
     .slice(0, 5)
 
   const recentSubmissions = submissions
-    .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime())
+    .filter(submission => submission.submitted_at)
+    .sort((a, b) => {
+      if (!a.submitted_at || !b.submitted_at) return 0
+      return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
+    })
     .slice(0, 3)
 
   const stats = [
@@ -63,29 +71,19 @@ export function StudentDashboard() {
       name: 'Enrolled Courses',
       value: enrollments.length,
       icon: BookOpen,
-      color: 'bg-pink-500',
-      href: '/student/courses'
+      color: 'bg-pink-500'
     },
     {
       name: 'Upcoming Assignments',
       value: upcomingAssignments.length,
       icon: Clock,
-      color: 'bg-blue-500',
-      href: '/student/courses'
-    },
-    {
-      name: 'Completed Assignments',
-      value: submissions.filter(s => s.grade).length,
-      icon: CheckCircle,
-      color: 'bg-green-500',
-      href: '/student/courses'
+      color: 'bg-blue-500'
     },
     {
       name: 'Total Submissions',
       value: submissions.length,
       icon: FileText,
-      color: 'bg-purple-500',
-      href: '/student/courses'
+      color: 'bg-purple-500'
     }
   ]
 
@@ -105,14 +103,13 @@ export function StudentDashboard() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {stats.map((stat) => {
           const Icon = stat.icon
           return (
-            <Link
+            <div
               key={stat.name}
-              to={stat.href}
-              className="bg-white rounded-xl shadow-sm border border-pink-100 p-6 hover:shadow-md transition-shadow"
+              className="bg-white rounded-xl shadow-sm border border-pink-100 p-6"
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -123,13 +120,13 @@ export function StudentDashboard() {
                   <Icon className="w-6 h-6 text-white" />
                 </div>
               </div>
-            </Link>
+            </div>
           )
         })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-6 h-fit">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold text-gray-900">Upcoming Assignments</h2>
             <Link
@@ -150,7 +147,7 @@ export function StudentDashboard() {
                   <div>
                     <h3 className="font-medium text-gray-900 group-hover:text-pink-700">{assignment.title}</h3>
                     <p className="text-sm text-gray-600">
-                      Due: {new Date(assignment.due_date).toLocaleDateString()}
+                      Due: {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString() : 'No due date'}
                     </p>
                     <p className="text-xs text-gray-500">{assignment.course?.title}</p>
                   </div>
@@ -163,15 +160,15 @@ export function StudentDashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-6 h-fit">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold text-gray-900">Recent Submissions</h2>
-            <Link
+            {/* <Link
               to="/student/courses"
               className="text-blue-600 hover:text-blue-700 text-sm font-medium"
             >
               View all
-            </Link>
+            </Link> */}
           </div>
           <div className="space-y-4">
             {recentSubmissions.length > 0 ? (
@@ -180,17 +177,26 @@ export function StudentDashboard() {
                   key={submission.id}
                   className="flex items-center justify-between p-4 bg-blue-50 rounded-lg"
                 >
-                  <div>
-                    <h3 className="font-medium text-gray-900">{submission.file_name}</h3>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-gray-900">
+                      {submission.original_filename || 'Unnamed file'}
+                    </h3>
                     <p className="text-sm text-gray-600">
-                      Submitted {new Date(submission.submitted_at).toLocaleDateString()}
+                      Submitted {submission.submitted_at ? new Date(submission.submitted_at).toLocaleDateString() : 'Unknown date'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {submission.assignment?.course?.title || 'Unknown Course'}
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {submission.grade !== undefined ? (
-                      <span className="text-green-600 font-medium">{submission.grade}%</span>
+                    {submission.grade !== null && submission.grade !== undefined ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        {submission.grade}/{submission.assignment?.total_points}
+                      </span>
                     ) : (
-                      <span className="text-yellow-600 font-medium">Pending</span>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        Pending
+                      </span>
                     )}
                   </div>
                 </div>

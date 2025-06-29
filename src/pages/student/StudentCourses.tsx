@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { BookOpen, Users, FileText, Plus } from 'lucide-react'
+import { BookOpen, Users, Plus } from 'lucide-react'
 import { Course, Enrollment } from '../../types'
 import { courseAPI, enrollmentAPI } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
@@ -10,6 +10,7 @@ export function StudentCourses() {
   const { user } = useAuth()
   const [enrolledCourses, setEnrolledCourses] = useState<Enrollment[]>([])
   const [availableCourses, setAvailableCourses] = useState<Course[]>([])
+  const [courseCounts, setCourseCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [enrolling, setEnrolling] = useState<string | null>(null)
 
@@ -22,8 +23,27 @@ export function StudentCourses() {
           enrollmentAPI.getByStudent(user.id),
           courseAPI.getAll()
         ])
+        
         setEnrolledCourses(enrolled)
-        setAvailableCourses(available)
+        
+        // Filter out courses the student is already enrolled in
+        const enrolledCourseIds = enrolled.map(e => e.course_id)
+        const filteredAvailable = available.filter(course => !enrolledCourseIds.includes(course.id))
+        setAvailableCourses(filteredAvailable)
+        
+        // Get student counts for all courses
+        const counts: Record<string, number> = {}
+        await Promise.all(available.map(async (course) => {
+          try {
+            const enrollments = await enrollmentAPI.getByCourse(course.id)
+            counts[course.id] = enrollments.length
+          } catch (error) {
+            console.error(`Error getting count for course ${course.id}:`, error)
+            counts[course.id] = 0
+          }
+        }))
+        setCourseCounts(counts)
+        
       } catch (error) {
         console.error('Error loading courses:', error)
         toast.error('Failed to load courses. Please try again.')
@@ -48,7 +68,18 @@ export function StudentCourses() {
         courseAPI.getAll()
       ])
       setEnrolledCourses(enrolled)
-      setAvailableCourses(available)
+      
+      // Filter out courses the student is already enrolled in
+      const enrolledCourseIds = enrolled.map(e => e.course_id)
+      const filteredAvailable = available.filter(course => !enrolledCourseIds.includes(course.id))
+      setAvailableCourses(filteredAvailable)
+      
+      // Update student count for the enrolled course
+      const enrollments = await enrollmentAPI.getByCourse(courseId)
+      setCourseCounts(prev => ({
+        ...prev,
+        [courseId]: enrollments.length
+      }))
       
       toast.success('Successfully enrolled in course!')
     } catch (error) {
@@ -97,7 +128,7 @@ export function StudentCourses() {
                     <h3 className="text-lg font-semibold text-gray-900 group-hover:text-pink-600 transition-colors">
                       {enrollment.course?.title}
                     </h3>
-                    <p className="text-sm text-gray-600 font-medium">{enrollment.course?.course_code}</p>
+                    <p className="text-sm text-gray-600 font-medium">{enrollment.course?.description}</p>
                   </div>
                   <BookOpen className="w-6 h-6 text-pink-500" />
                 </div>
@@ -105,15 +136,9 @@ export function StudentCourses() {
                 <p className="text-gray-600 text-sm mb-4 line-clamp-2">{enrollment.course?.description}</p>
                 
                 <div className="flex items-center justify-between text-sm text-gray-500">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-1">
-                      <Users className="w-4 h-4" />
-                      <span>45 students</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <FileText className="w-4 h-4" />
-                      <span>12 assignments</span>
-                    </div>
+                  <div className="flex items-center space-x-1">
+                    <Users className="w-4 h-4" />
+                    <span>{courseCounts[enrollment.course_id] || 0} students</span>
                   </div>
                   <span className="text-pink-600 font-medium">View →</span>
                 </div>
@@ -143,7 +168,7 @@ export function StudentCourses() {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-gray-900">{course.title}</h3>
-                    <p className="text-sm text-gray-600 font-medium">{course.course_code}</p>
+                    <p className="text-sm text-gray-600 font-medium">{course.teacher?.full_name}</p>
                   </div>
                   <BookOpen className="w-6 h-6 text-blue-500" />
                 </div>
@@ -151,15 +176,9 @@ export function StudentCourses() {
                 <p className="text-gray-600 text-sm mb-4 line-clamp-2">{course.description}</p>
                 
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4 text-sm text-gray-500">
-                    <div className="flex items-center space-x-1">
-                      <Users className="w-4 h-4" />
-                      <span>45 students</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <FileText className="w-4 h-4" />
-                      <span>12 assignments</span>
-                    </div>
+                  <div className="flex items-center space-x-1 text-sm text-gray-500">
+                    <Users className="w-4 h-4" />
+                    <span>{courseCounts[course.id] || 0} students</span>
                   </div>
                   
                   <button
