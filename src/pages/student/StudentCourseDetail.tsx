@@ -5,6 +5,7 @@ import { ArrowLeft, FileText, Clock, CheckCircle, Calendar, User } from 'lucide-
 import { Course, Assignment } from '../../types'
 import { courseAPI, assignmentAPI } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
+import { ElevenLabsWidget } from '../../components/ElevenLabsWidget'
 
 export function StudentCourseDetail() {
   const { courseId } = useParams<{ courseId: string }>()
@@ -13,6 +14,10 @@ export function StudentCourseDetail() {
   const [course, setCourse] = useState<Course | null>(null)
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // CS500 course ID for voice agent widget
+  const CS500_COURSE_ID = "daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5"
+  const isCS500 = courseId === CS500_COURSE_ID
 
   useEffect(() => {
     const loadCourseData = async () => {
@@ -223,6 +228,17 @@ export function StudentCourseDetail() {
           </div>
         )}
       </div>
+
+      {/* ElevenLabs Voice Agent Widget - Only for CS500 */}
+      {isCS500 && user?.role === 'student' && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <ElevenLabsWidget 
+            agentId="agent_01jyw3jamyf73szrx0803sj6b2"
+            courseId={courseId}
+            courseName={course?.title}
+          />
+        </div>
+      )}
     </div>
   )
 } 
