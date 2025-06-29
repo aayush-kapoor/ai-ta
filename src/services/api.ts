@@ -17,6 +17,27 @@ import {
   CreateChatThreadData
 } from '../types'
 
+// Helper function to trigger knowledge base updates for CS500
+const triggerKnowledgeBaseUpdate = async (courseId: string) => {
+  const CS500_COURSE_ID = "daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5"
+  if (courseId === CS500_COURSE_ID) {
+    try {
+      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/voice-agent/update-context`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: "system", // Dummy ID since we get all students now
+          course_id: CS500_COURSE_ID,
+          agent_id: "agent_01jyw3jamyf73szrx0803sj6b2"
+        })
+      })
+      console.log('✅ Knowledge base push successful')
+    } catch (e) {
+      console.error('Failed to trigger knowledge base update:', e)
+    }
+  }
+}
+
 // Course API
 export const courseAPI = {
   async getAll(): Promise<Course[]> {
@@ -71,6 +92,10 @@ export const courseAPI = {
       .single()
 
     if (error) throw error
+    
+    // Trigger knowledge base update for CS500 course
+    await triggerKnowledgeBaseUpdate(data.id)
+    
     return data
   },
 
@@ -86,6 +111,10 @@ export const courseAPI = {
       .single()
 
     if (error) throw error
+    
+    // Trigger knowledge base update for CS500 course
+    await triggerKnowledgeBaseUpdate(data.id)
+    
     return data
   },
 
@@ -96,6 +125,9 @@ export const courseAPI = {
       .eq('id', id)
 
     if (error) throw error
+    
+    // Trigger knowledge base update after deletion
+    await triggerKnowledgeBaseUpdate(id)
   }
 }
 
@@ -160,6 +192,12 @@ export const assignmentAPI = {
       .single()
 
     if (error) throw error
+    
+    // Trigger knowledge base update for CS500 course
+    if (data.course) {
+      await triggerKnowledgeBaseUpdate(data.course.id)
+    }
+    
     return data
   },
 
@@ -175,6 +213,12 @@ export const assignmentAPI = {
       .single()
 
     if (error) throw error
+    
+    // Trigger knowledge base update for CS500 course
+    if (data.course) {
+      await triggerKnowledgeBaseUpdate(data.course.id)
+    }
+    
     return data
   },
 
@@ -190,16 +234,34 @@ export const assignmentAPI = {
       .single()
 
     if (error) throw error
+    
+    // Trigger knowledge base update for CS500 course
+    if (data.course) {
+      await triggerKnowledgeBaseUpdate(data.course.id)
+    }
+    
     return data
   },
 
   async delete(id: string): Promise<void> {
+    // Get assignment info before deletion to check course
+    const { data: assignment } = await supabase
+      .from('assignments')
+      .select('course_id')
+      .eq('id', id)
+      .single()
+    
     const { error } = await supabase
       .from('assignments')
       .delete()
       .eq('id', id)
 
     if (error) throw error
+    
+    // Trigger knowledge base update for CS500 course after deletion
+    if (assignment?.course_id) {
+      await triggerKnowledgeBaseUpdate(assignment.course_id)
+    }
   }
 }
 
@@ -423,6 +485,10 @@ export const enrollmentAPI = {
       .single()
 
     if (error) throw error
+    
+    // Trigger knowledge base update for CS500 course
+    await triggerKnowledgeBaseUpdate(courseId)
+    
     return data
   },
 
@@ -434,6 +500,9 @@ export const enrollmentAPI = {
       .eq('student_id', studentId)
 
     if (error) throw error
+    
+    // Trigger knowledge base update for CS500 course
+    await triggerKnowledgeBaseUpdate(courseId)
   }
 }
 
