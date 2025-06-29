@@ -22,7 +22,13 @@ export function StudentAssignmentView() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabType>('details')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploadedFile, setUploadedFile] = useState<{
+    path: string
+    size: number
+    name: string
+  } | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -45,6 +51,12 @@ export function StudentAssignmentView() {
         setAssignment(assignmentData)
         setCourse(courseData)
         setSubmission(submissionData)
+        
+        // Clear uploaded file state if there's already a submission
+        if (submissionData) {
+          setUploadedFile(null)
+          setSelectedFile(null)
+        }
       } catch (error) {
         console.error('Error loading assignment data:', error)
         toast.error('Failed to load assignment data. Please try again.')
@@ -64,30 +76,53 @@ export function StudentAssignmentView() {
 
   const handleFileRemove = () => {
     setSelectedFile(null)
+    setUploadedFile(null)
     setUploadError(null)
   }
 
-  const handleSubmitAssignment = async () => {
+  const handleFileUpload = async () => {
     if (!selectedFile || !assignment || !user) return
 
     setIsUploading(true)
     setUploadError(null)
 
     try {
-      // Upload file to storage
+      // Upload file to storage only
       const uploadResult = await fileUploadService.uploadAssignmentFile(
         selectedFile,
         user.id,
         assignment.id
       )
 
-      // Create or update submission record
+      setUploadedFile({
+        path: uploadResult.path,
+        size: uploadResult.size,
+        name: selectedFile.name
+      })
+
+      setSelectedFile(null)
+      toast.success('File uploaded successfully! Click "Submit Assignment" to finalize your submission.')
+    } catch (error) {
+      console.error('Upload error:', error)
+      setUploadError(error instanceof Error ? error.message : 'Failed to upload file')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleSubmitAssignment = async () => {
+    if (!uploadedFile || !assignment || !user) return
+
+    setIsSubmitting(true)
+
+    try {
+      // Create or update submission record with already uploaded file
       const submissionData = {
         assignment_id: assignment.id,
         student_id: user.id,
-        file_path: uploadResult.path,
-        file_size: uploadResult.size,
-        original_filename: selectedFile.name,
+        file_path: uploadedFile.path,
+        file_size: uploadedFile.size,
+        original_filename: uploadedFile.name,
         status: 'submitted' as const,
         submitted_at: new Date().toISOString()
       }
@@ -102,13 +137,13 @@ export function StudentAssignmentView() {
       }
 
       setSubmission(newSubmission)
-      setSelectedFile(null)
+      setUploadedFile(null)
       toast.success('Assignment submitted successfully!')
     } catch (error) {
       console.error('Submission error:', error)
-      setUploadError(error instanceof Error ? error.message : 'Failed to submit assignment')
+      toast.error(error instanceof Error ? error.message : 'Failed to submit assignment')
     } finally {
-      setIsUploading(false)
+      setIsSubmitting(false)
     }
   }
 
@@ -414,31 +449,77 @@ export function StudentAssignmentView() {
                   selectedFile={selectedFile}
                   isUploading={isUploading}
                   error={uploadError}
-                  disabled={isUploading}
+                  disabled={isUploading || isSubmitting}
                 />
 
-                {selectedFile && (
+                {/* Step 1: Upload File */}
+                {selectedFile && !uploadedFile && (
                   <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                     <div className="text-sm text-gray-600">
-                      Ready to submit: <span className="font-medium">{selectedFile.name}</span>
+                      Ready to upload: <span className="font-medium">{selectedFile.name}</span>
                     </div>
                     <button
-                      onClick={handleSubmitAssignment}
+                      onClick={handleFileUpload}
                       disabled={isUploading}
-                      className="bg-gradient-to-r from-pink-500 to-blue-500 text-white px-6 py-2 rounded-lg hover:from-pink-600 hover:to-blue-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                     >
                       {isUploading ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          <span>Submitting...</span>
+                          <span>Uploading...</span>
                         </>
                       ) : (
                         <>
                           <Upload className="w-4 h-4" />
-                          <span>{submission ? 'Resubmit' : 'Submit'} Assignment</span>
+                          <span>Upload File</span>
                         </>
                       )}
                     </button>
+                  </div>
+                )}
+
+                {/* Step 2: File Uploaded - Ready to Submit */}
+                {uploadedFile && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="font-medium text-green-900">File Uploaded Successfully</p>
+                        <p className="text-sm text-green-700">{uploadedFile.name}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between pt-3 border-t border-green-200">
+                      <div className="text-sm text-green-700">
+                        File size: {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => setUploadedFile(null)}
+                          disabled={isSubmitting}
+                          className="text-sm text-green-600 hover:text-green-800 font-medium disabled:opacity-50"
+                        >
+                          Upload Different File
+                        </button>
+                        <button
+                          onClick={handleSubmitAssignment}
+                          disabled={isSubmitting}
+                          className="bg-gradient-to-r from-pink-500 to-blue-500 text-white px-6 py-2 rounded-lg hover:from-pink-600 hover:to-blue-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              <span>Submitting...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="w-4 h-4" />
+                              <span>{submission ? 'Resubmit' : 'Submit'} Assignment</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
