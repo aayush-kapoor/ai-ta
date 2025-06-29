@@ -44,30 +44,14 @@ async def update_voice_agent_context(
                 knowledge_base_updated=False
             )
         
-        # Build the course context for this student
-        # Use service role to bypass RLS (no authentication needed for testing)
-        context_builder = CourseContextBuilder()  # No token = service role
-        course_context = await context_builder.build_context(request.student_id, request.course_id)
-        
-        if not course_context:
-            return VoiceAgentResponse(
-                success=False,
-                message="Failed to build course context. Please ensure you are enrolled in this course.",
-                context=None,
-                agent_id=None,
-                knowledge_base_updated=False
-            )
-        
-        # The agent_id should be provided by the frontend or configured elsewhere
-        # For now, we'll expect it to be passed as a parameter or use a default
-        # You can modify this to get the agent_id from your configuration
+        # Get the agent_id - should be provided by the frontend
         agent_id = request.agent_id if hasattr(request, 'agent_id') and request.agent_id else None
         
         if not agent_id:
             return VoiceAgentResponse(
                 success=False,
                 message="No agent_id provided. Please specify which ElevenLabs agent to update.",
-                context=course_context,
+                context=None,
                 agent_id=None,
                 knowledge_base_updated=False
             )
@@ -79,7 +63,7 @@ async def update_voice_agent_context(
                 return VoiceAgentResponse(
                     success=False,
                     message=f"Agent {agent_id} not found in ElevenLabs",
-                    context=course_context,
+                    context=None,
                     agent_id=agent_id,
                     knowledge_base_updated=False
                 )
@@ -88,20 +72,20 @@ async def update_voice_agent_context(
             return VoiceAgentResponse(
                 success=False,
                 message=f"Failed to verify agent: {str(e)}",
-                context=course_context,
+                context=None,
                 agent_id=agent_id,
                 knowledge_base_updated=False
             )
         
-        # Update the agent's knowledge base with the course context
-        knowledge_base_updated = await elevenlabs_service.update_knowledge_base(agent_id, course_context)
+        # Update the agent's knowledge base with ALL STUDENTS' context for this course
+        knowledge_base_updated = await elevenlabs_service.update_knowledge_base_all_students(agent_id, request.course_id)
         
         if knowledge_base_updated:
-            logger.info(f"Successfully updated voice agent {agent_id} for student {request.student_id}")
+            logger.info(f"Successfully updated voice agent {agent_id} with ALL STUDENTS for course {request.course_id}")
             return VoiceAgentResponse(
                 success=True,
-                message=f"Voice agent context updated successfully for {course_context.course.title}",
-                context=course_context,
+                message=f"Voice agent context updated successfully with ALL STUDENTS for course {request.course_id}",
+                context=None,  # We don't return individual context anymore since it's all students
                 agent_id=agent_id,
                 knowledge_base_updated=True
             )
@@ -109,8 +93,8 @@ async def update_voice_agent_context(
             logger.warning(f"Failed to update knowledge base for agent {agent_id}")
             return VoiceAgentResponse(
                 success=False,
-                message="Failed to update voice agent knowledge base. The agent was created but context update failed.",
-                context=course_context,
+                message="Failed to update voice agent knowledge base with all students.",
+                context=None,
                 agent_id=agent_id,
                 knowledge_base_updated=False
             )

@@ -90,6 +90,63 @@ class ElevenLabsAgentService:
         except Exception as e:
             logger.error(f"Error updating knowledge base for agent {agent_id}: {e}")
             return False
+
+    async def update_knowledge_base_all_students(self, agent_id: str, course_id: str) -> bool:
+        """
+        Update the ElevenLabs agent's knowledge base with ALL STUDENTS' context for a course
+        Complete pipeline: delete RAG indices → create document → create RAG index → cleanup old docs → attach to agent
+        """
+        try:
+            logger.info(f"Starting knowledge base update for agent {agent_id} with ALL STUDENTS in course {course_id}")
+            
+            # Step 1: Delete all existing RAG indices
+            await self._delete_existing_rag_indices()
+            
+            # Step 2: Build context for all students in the course
+            context_builder = CourseContextBuilder()  # Use service role
+            all_students_context = await context_builder.build_context_for_all_students(course_id)
+            
+            if not all_students_context:
+                logger.error(f"Failed to build context for all students in course {course_id}")
+                return False
+            
+            # Step 3: Create context document text with ALL students
+            context_text = self._create_all_students_context_document(
+                all_students_context, 
+                all_students_context["course"]["title"]
+            )
+            
+            # Parse the JSON, set the agent_id, and convert back to string
+            context_json = json.loads(context_text)
+            context_json["agent_id"] = agent_id
+            context_text = json.dumps(context_json, indent=2, ensure_ascii=False)
+            
+            document_name = f"course_context_ALL_STUDENTS_{all_students_context['course']['title']}_{course_id}"
+            
+            # Step 4: Upload new knowledge base document
+            response = self.client.conversational_ai.knowledge_base.documents.create_from_text(
+                name=document_name,
+                text=context_text
+            )
+            
+            new_document_id = response.id
+            logger.info(f"Created knowledge base document with ALL STUDENTS: {new_document_id} - {document_name}")
+            
+            # Step 5: Create RAG index for the new document
+            await self._create_rag_index(new_document_id)
+            
+            # Step 6: Clean up old documents (keep only the new one)
+            await self._cleanup_old_documents(new_document_id)
+            
+            # Step 7: Attach knowledge base to agent
+            await self._attach_knowledge_base_to_agent(agent_id, new_document_id, document_name)
+            
+            logger.info(f"Successfully updated knowledge base for agent {agent_id} with {len(all_students_context['students'])} students")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error updating knowledge base with all students for agent {agent_id}: {e}")
+            return False
     
     async def _delete_existing_rag_indices(self) -> None:
         """
@@ -282,10 +339,33 @@ class ElevenLabsAgentService:
         # Return as formatted JSON text
         return json.dumps(knowledge_base_json, indent=2, ensure_ascii=False)
 
+    def _create_all_students_context_document(self, context_data: Dict[str, Any], course_title: str) -> str:
+        """
+        Create a comprehensive context document for ALL students in the course
+        Returns JSON format with all students' information
+        """
+        
+        # Create the complete JSON structure with ALL students
+        knowledge_base_json = {
+            "success": True,
+            "message": f"Voice agent context updated successfully for {course_title} - ALL STUDENTS",
+            "context": {
+                "course": context_data["course"],
+                "students": context_data["students"],
+                "context_updated_at": context_data["context_updated_at"]
+            },
+            "agent_id": None,  # Will be set by the calling function
+            "knowledge_base_updated": True
+        }
+        
+        # Return as formatted JSON text
+        return json.dumps(knowledge_base_json, indent=2, ensure_ascii=False)
+
     async def trigger_knowledge_base_update_for_course(self, course_id: str, agent_id: str = "agent_01jyw3jamyf73szrx0803sj6b2") -> None:
         """
-        Trigger knowledge base update for all enrolled students in a course
+        Trigger knowledge base update with ALL STUDENTS for a course
         Only updates for CS500 course (daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5)
+        Uses the new all-students approach for comprehensive context
         """
         try:
             # Only update for CS500 course
@@ -293,29 +373,19 @@ class ElevenLabsAgentService:
             if course_id != CS500_COURSE_ID:
                 return
             
-            # Get all enrolled students in this course
-            admin_client = get_authenticated_client()  # Service role
-            enrollments_result = admin_client.table("enrollments").select(
-                "student_id"
-            ).eq("course_id", course_id).execute()
+            logger.info(f"Triggering knowledge base update for ALL STUDENTS in course {course_id}")
             
-            if not enrollments_result.data:
-                return
-                
-            # Update knowledge base for each enrolled student
-            for enrollment in enrollments_result.data:
-                student_id = enrollment["student_id"]
-                try:
-                    context_builder = CourseContextBuilder()
-                    context = await context_builder.build_context(student_id, course_id)
-                    if context:
-                        await self.update_knowledge_base(agent_id, context)
-                        print(f"✅ Knowledge base push successful for student {student_id} in CS500")
-                except Exception as e:
-                    logger.error(f"Failed to update knowledge base for student {student_id}: {e}")
+            # Update knowledge base with ALL students' information
+            success = await self.update_knowledge_base_all_students(agent_id, course_id)
+            
+            if success:
+                print(f"✅ Knowledge base push successful for ALL STUDENTS in CS500")
+                logger.info(f"Successfully updated knowledge base with all students for course {course_id}")
+            else:
+                logger.error(f"Failed to update knowledge base with all students for course {course_id}")
                     
         except Exception as e:
-            logger.error(f"Error triggering knowledge base updates for course {course_id}: {e}")
+            logger.error(f"Error triggering knowledge base update for course {course_id}: {e}")
 
 class CourseContextBuilder:
     """
@@ -325,6 +395,103 @@ class CourseContextBuilder:
     def __init__(self, user_token: str = None):
         self.db_client = get_authenticated_client(user_token)
     
+    async def build_context_for_all_students(self, course_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Build complete course context including ALL students in the course
+        Returns a comprehensive context dictionary with all students' information
+        """
+        try:
+            logger.info(f"Building context for ALL students in course {course_id}")
+            
+            # Get course information
+            course_info = await self._get_course_info(course_id)
+            if not course_info:
+                logger.error(f"Course {course_id} not found")
+                return None
+            
+            # Get all enrolled students
+            all_students = await self._get_all_enrolled_students(course_id)
+            if not all_students:
+                logger.error(f"No students found enrolled in course {course_id}")
+                return None
+                
+            # Get all assignments for the course (once, since they're the same for all students)
+            assignments_result = self.db_client.table("assignments").select(
+                "id, title, description, due_date, total_points, status, rubric_markdown"
+            ).eq("course_id", course_id).order("created_at", desc=False).execute()
+            
+            # Build students data with their submissions
+            students_data = []
+            for student in all_students:
+                student_assignments = []
+                
+                # For each assignment, get this student's submission
+                for assignment_data in assignments_result.data:
+                    submission_data = await self._get_student_submission(assignment_data["id"], student["id"])
+                    
+                    assignment_context = {
+                        "id": assignment_data["id"],
+                        "title": assignment_data["title"],
+                        "description": assignment_data.get("description"),
+                        "due_date": assignment_data.get("due_date"),
+                        "total_points": assignment_data["total_points"],
+                        "status": assignment_data["status"],
+                        "rubric": assignment_data.get("rubric_markdown"),
+                        "has_submission": submission_data is not None,
+                        "submission_status": submission_data.get("status") if submission_data else None,
+                        "submission_file_path": submission_data.get("file_path") if submission_data else None,
+                        "submission_content": submission_data.get("content") if submission_data else None,
+                        "grade": submission_data.get("grade") if submission_data else None,
+                        "feedback": submission_data.get("feedback") if submission_data else None
+                    }
+                    student_assignments.append(assignment_context)
+                
+                # Add student with their assignments
+                student_data = {
+                    "id": student["id"],
+                    "name": student["full_name"],
+                    "email": student["email"],
+                    "assignments": student_assignments
+                }
+                students_data.append(student_data)
+            
+            # Build the complete context
+            context = {
+                "course": {
+                    "id": course_info["id"],
+                    "title": course_info["title"],
+                    "description": course_info.get("description"),
+                    "total_students": len(students_data)
+                },
+                "students": students_data,
+                "context_updated_at": datetime.utcnow().isoformat()
+            }
+            
+            logger.info(f"Successfully built context for {len(students_data)} students with {len(assignments_result.data)} assignments each")
+            return context
+            
+        except Exception as e:
+            logger.error(f"Error building context for all students in course {course_id}: {e}")
+            return None
+
+    async def _get_all_enrolled_students(self, course_id: str) -> List[Dict[str, Any]]:
+        """Get all students enrolled in the course"""
+        try:
+            result = self.db_client.table("enrollments").select(
+                "student:users!student_id(id, full_name, email)"
+            ).eq("course_id", course_id).execute()
+            
+            students = []
+            for enrollment in result.data:
+                if enrollment.get("student"):
+                    students.append(enrollment["student"])
+            
+            return students
+            
+        except Exception as e:
+            logger.error(f"Error fetching enrolled students for course {course_id}: {e}")
+            return []
+
     async def build_context(self, student_id: str, course_id: str) -> Optional[VoiceAgentContext]:
         """
         Build complete course context for a specific student
