@@ -16,6 +16,9 @@ SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 # OpenAI Configuration (Required)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+# ElevenLabs Configuration
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+
 # Test user configuration (for development)
 TEST_USER_ID = os.getenv("TEST_USER_ID")
 TEST_USER_EMAIL = os.getenv("TEST_USER_EMAIL")

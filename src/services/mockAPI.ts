@@ -7,7 +7,7 @@ const mockCourses: Course[] = [
     id: 'course-1',
     title: 'Introduction to Computer Science',
     description: 'A comprehensive introduction to computer science concepts and programming fundamentals.',
-    course_code: 'CS101',
+    course_code: 'CS500',
     teacher_id: 'teacher-1',
     created_at: new Date().toISOString()
   },

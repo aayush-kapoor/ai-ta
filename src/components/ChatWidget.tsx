@@ -420,7 +420,7 @@ export function ChatWidget() {
                     <p className="text-sm">Hi! I'm Mylo, your AI teaching assistant.</p>
                     <p className="text-xs text-gray-400 mt-2 leading-relaxed">
                       <strong>Try asking me:</strong><br/>
-                      • "Create assignment 'Quiz 1' for CS101"<br/>
+                      • "Create assignment 'Quiz 1' for CS500"<br/>
                       • "How many students submitted homework 1?"<br/>
                       • "Help me understand your features"
                     </p>

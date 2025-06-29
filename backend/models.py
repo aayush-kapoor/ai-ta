@@ -44,4 +44,54 @@ class GradeSubmissionRequest(BaseModel):
     grade: float
     feedback: str
     show_detailed_feedback: bool = False
-    detailed_feedback_json: Optional[Dict[str, Any]] = None 
+    detailed_feedback_json: Optional[Dict[str, Any]] = None
+
+# ElevenLabs Voice Agent Models
+class StudentInfo(BaseModel):
+    """Student information for voice agent context"""
+    id: str
+    name: str
+    email: str
+
+class AssignmentContext(BaseModel):
+    """Assignment context for voice agent"""
+    id: str
+    title: str
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    total_points: int
+    status: str
+    rubric: Optional[str] = None
+    has_submission: bool = False
+    submission_status: Optional[str] = None
+    submission_file_path: Optional[str] = None
+    submission_content: Optional[str] = None
+    grade: Optional[float] = None
+    feedback: Optional[str] = None
+
+class CourseContext(BaseModel):
+    """Course context for voice agent"""
+    id: str
+    title: str
+    description: Optional[str] = None
+    assignments: List[AssignmentContext] = []
+
+class VoiceAgentContext(BaseModel):
+    """Complete context for ElevenLabs voice agent"""
+    student: StudentInfo
+    course: CourseContext
+    context_updated_at: str
+
+class VoiceAgentRequest(BaseModel):
+    """Request model for voice agent context updates"""
+    student_id: str
+    course_id: str
+    agent_id: Optional[str] = None  # ElevenLabs agent ID to update
+
+class VoiceAgentResponse(BaseModel):
+    """Response model for voice agent context updates"""
+    success: bool
+    message: str
+    context: Optional[VoiceAgentContext] = None
+    agent_id: Optional[str] = None
+    knowledge_base_updated: bool = False 

@@ -13,6 +13,7 @@ from config import validate_config, CORS_ORIGINS, HOST, PORT
 # Import API routers
 from api.agent import router as agent_router
 from api.debug import router as debug_router
+from api.voice_agent import router as voice_agent_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -40,6 +41,7 @@ app.add_middleware(
 # Register API routers
 app.include_router(agent_router, prefix="/api/agent", tags=["agent"])
 app.include_router(debug_router, prefix="/debug", tags=["debug"])
+app.include_router(voice_agent_router)
 
 # Basic routes
 @app.get("/")

@@ -209,19 +209,19 @@ class MyloAgent:
         Result: create_assignment(title: "final exam", course: "machine learning course")
 
         Another Example:
-        [1] "create assignment for CS101" → Agent has course, asks for name
-        [2] "call it midterm" → "it" = the assignment being created for CS101
-        Result: create_assignment(title: "midterm", course: "CS101")
+        [1] "create assignment for CS500" → Agent has course, asks for name
+        [2] "call it midterm" → "it" = the assignment being created for CS500
+        Result: create_assignment(title: "midterm", course: "CS500")
 
         EXAMPLES OF CONVERSATIONAL INFORMATION GATHERING WITH CONTEXT:
 
         EXAMPLE 1 - Basic Information Gathering:
         [1] User: "need help creating an assignment"
         [1] Agent: {"intent": "conversation", "response": "I'd love to help! Which course and what should it be called?"}
-        [2] User: "CS101"  
-        [2] Agent: {"intent": "conversation", "response": "Great! CS101. What should the assignment be called?"}
+        [2] User: "CS500"  
+        [2] Agent: {"intent": "conversation", "response": "Great! CS500. What should the assignment be called?"}
         [3] User: "Midterm Exam"
-        [3] Agent: {"intent": "create_assignment", "parameters": {"title": "Midterm Exam", "course": "CS101"}}
+        [3] Agent: {"intent": "create_assignment", "parameters": {"title": "Midterm Exam", "course": "CS500"}}
 
         EXAMPLE 2 - Context Resolution (CRITICAL):
         [1] User: "need help creating an assignment"
