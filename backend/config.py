@@ -18,6 +18,8 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # ElevenLabs Configuration
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+ELEVENLABS_AGENT_ID = os.getenv("ELEVENLABS_AGENT_ID")
+CS500_COURSE_ID = os.getenv("CS500_COURSE_ID")
 
 # Test user configuration (for development)
 TEST_USER_ID = os.getenv("TEST_USER_ID")

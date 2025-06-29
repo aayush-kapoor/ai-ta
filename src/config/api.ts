@@ -7,6 +7,10 @@
 export const API_CONFIG = {
   BACKEND_URL: import.meta.env.VITE_API_URL || 'http://0.0.0.0:8000',
   
+  // Course and Agent Configuration
+  CS500_COURSE_ID: import.meta.env.VITE_CS500_COURSE_ID,
+  ELEVENLABS_AGENT_ID: import.meta.env.VITE_ELEVENLABS_AGENT_ID,
+  
   // Endpoints
   ENDPOINTS: {
     AGENT_PROCESS: '/api/agent/process',

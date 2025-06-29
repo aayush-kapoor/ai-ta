@@ -6,6 +6,7 @@ import { Course, Assignment } from '../../types'
 import { courseAPI, assignmentAPI } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { ElevenLabsWidget } from '../../components/ElevenLabsWidget'
+import { API_CONFIG } from '../../config/api'
 
 export function StudentCourseDetail() {
   const { courseId } = useParams<{ courseId: string }>()
@@ -15,9 +16,8 @@ export function StudentCourseDetail() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   
-  // CS500 course ID for voice agent widget
-  const CS500_COURSE_ID = "daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5"
-  const isCS500 = courseId === CS500_COURSE_ID
+  // Check if this is CS500 course for voice agent widget
+  const isCS500 = courseId === API_CONFIG.CS500_COURSE_ID
 
   useEffect(() => {
     const loadCourseData = async () => {
@@ -34,8 +34,7 @@ export function StudentCourseDetail() {
         setAssignments(assignmentsData.filter(a => a.status === 'published'))
         
         // Trigger knowledge base update on first visit to CS500 course
-        const CS500_COURSE_ID = "daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5"
-        if (courseId === CS500_COURSE_ID && user?.role === 'student') {
+        if (courseId === API_CONFIG.CS500_COURSE_ID && user?.role === 'student') {
           const sessionKey = `kb_updated_${courseId}_${user.id}`
           const hasUpdatedThisSession = sessionStorage.getItem(sessionKey)
           
@@ -46,8 +45,8 @@ export function StudentCourseDetail() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   student_id: user.id,
-                  course_id: CS500_COURSE_ID,
-                  agent_id: "agent_01jyw3jamyf73szrx0803sj6b2"
+                  course_id: API_CONFIG.CS500_COURSE_ID,
+                  agent_id: API_CONFIG.ELEVENLABS_AGENT_ID
                 })
               })
               console.log('✅ Knowledge base push successful on first CS500 navigation')
@@ -233,7 +232,7 @@ export function StudentCourseDetail() {
       {isCS500 && user?.role === 'student' && (
         <div className="fixed bottom-4 right-4 z-50">
           <ElevenLabsWidget 
-            agentId="agent_01jyw3jamyf73szrx0803sj6b2"
+            agentId={API_CONFIG.ELEVENLABS_AGENT_ID}
             courseId={courseId}
             courseName={course?.title}
           />

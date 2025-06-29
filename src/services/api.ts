@@ -16,19 +16,19 @@ import {
   CreateChatMessageData,
   CreateChatThreadData
 } from '../types'
+import { API_CONFIG } from '../config/api'
 
 // Helper function to trigger knowledge base updates for CS500
 const triggerKnowledgeBaseUpdate = async (courseId: string) => {
-  const CS500_COURSE_ID = "daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5"
-  if (courseId === CS500_COURSE_ID) {
+  if (courseId === API_CONFIG.CS500_COURSE_ID) {
     try {
       await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/voice-agent/update-context`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           student_id: "system", // Dummy ID since we get all students now
-          course_id: CS500_COURSE_ID,
-          agent_id: "agent_01jyw3jamyf73szrx0803sj6b2"
+          course_id: API_CONFIG.CS500_COURSE_ID,
+          agent_id: API_CONFIG.ELEVENLABS_AGENT_ID
         })
       })
       console.log('✅ Knowledge base push successful')
@@ -312,15 +312,14 @@ export const submissionAPI = {
     
             // Trigger knowledge base update for CS500 course
         try {
-          const CS500_COURSE_ID = "daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5"
-          if (data.assignment?.course_id === CS500_COURSE_ID) {
+          if (data.assignment?.course_id === API_CONFIG.CS500_COURSE_ID) {
             await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/voice-agent/update-context`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 student_id: submissionData.student_id,
-                course_id: CS500_COURSE_ID,
-                agent_id: "agent_01jyw3jamyf73szrx0803sj6b2"
+                course_id: API_CONFIG.CS500_COURSE_ID,
+                agent_id: API_CONFIG.ELEVENLABS_AGENT_ID
               })
             })
             console.log('✅ Knowledge base push successful after submission creation')
@@ -379,15 +378,14 @@ export const submissionAPI = {
     
             // Trigger knowledge base update for CS500 course
         try {
-          const CS500_COURSE_ID = "daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5"
-          if (data.assignment?.course_id === CS500_COURSE_ID) {
+          if (data.assignment?.course_id === API_CONFIG.CS500_COURSE_ID) {
             await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/voice-agent/update-context`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 student_id: data.student_id,
-                course_id: CS500_COURSE_ID,
-                agent_id: "agent_01jyw3jamyf73szrx0803sj6b2"
+                course_id: API_CONFIG.CS500_COURSE_ID,
+                agent_id: API_CONFIG.ELEVENLABS_AGENT_ID
               })
             })
             console.log('✅ Knowledge base push successful after submission update')
@@ -420,15 +418,14 @@ export const submissionAPI = {
     
             // Trigger knowledge base update for CS500 course
         try {
-          const CS500_COURSE_ID = "daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5"
-          if (data.assignment?.course_id === CS500_COURSE_ID) {
+          if (data.assignment?.course_id === API_CONFIG.CS500_COURSE_ID) {
             await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/voice-agent/update-context`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 student_id: data.student_id,
-                course_id: CS500_COURSE_ID,
-                agent_id: "agent_01jyw3jamyf73szrx0803sj6b2"
+                course_id: API_CONFIG.CS500_COURSE_ID,
+                agent_id: API_CONFIG.ELEVENLABS_AGENT_ID
               })
             })
             console.log('✅ Knowledge base push successful after submission grading')

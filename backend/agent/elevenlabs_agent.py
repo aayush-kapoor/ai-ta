@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
-from config import ELEVENLABS_API_KEY
+from config import ELEVENLABS_API_KEY, CS500_COURSE_ID, ELEVENLABS_AGENT_ID
 from models import VoiceAgentContext, StudentInfo, CourseContext, AssignmentContext
 from database import get_authenticated_client, supabase
 import tempfile
@@ -361,15 +361,18 @@ class ElevenLabsAgentService:
         # Return as formatted JSON text
         return json.dumps(knowledge_base_json, indent=2, ensure_ascii=False)
 
-    async def trigger_knowledge_base_update_for_course(self, course_id: str, agent_id: str = "agent_01jyw3jamyf73szrx0803sj6b2") -> None:
+    async def trigger_knowledge_base_update_for_course(self, course_id: str, agent_id: str = None) -> None:
         """
         Trigger knowledge base update with ALL STUDENTS for a course
-        Only updates for CS500 course (daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5)
+        Only updates for CS500 course
         Uses the new all-students approach for comprehensive context
         """
         try:
+            # Use default agent ID if not provided
+            if not agent_id:
+                agent_id = ELEVENLABS_AGENT_ID
+                
             # Only update for CS500 course
-            CS500_COURSE_ID = "daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5"
             if course_id != CS500_COURSE_ID:
                 return
             
