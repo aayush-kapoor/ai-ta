@@ -40,7 +40,7 @@ export function StudentCourseDetail() {
           
           if (!hasUpdatedThisSession) {
             try {
-              await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/voice-agent/update-context`, {
+              await fetch(`${API_CONFIG.BACKEND_URL}/api/voice-agent/update-context`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

@@ -32,11 +32,17 @@ PORT = int(os.getenv("PORT", "8000"))
 
 # CORS Configuration
 CORS_ORIGINS = [
-    "http://localhost:5173", 
+    "https://mylo-ta.vercel.app",    # Production Vercel domain
+    "http://localhost:5173",         # Local Vite dev server
     "http://127.0.0.1:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5174"
+    "http://localhost:5174",         # Alternative Vite port
+    "http://127.0.0.1:5174",
+    "http://localhost:3000",         # Alternative React port
 ]
+
+# Allow environment variable to override CORS origins
+if os.getenv("CORS_ORIGINS"):
+    CORS_ORIGINS = os.getenv("CORS_ORIGINS").split(",")
 
 # Validation
 def validate_config():

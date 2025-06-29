@@ -22,7 +22,7 @@ import { API_CONFIG } from '../config/api'
 const triggerKnowledgeBaseUpdate = async (courseId: string) => {
   if (courseId === API_CONFIG.CS500_COURSE_ID) {
     try {
-      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/voice-agent/update-context`, {
+      await fetch(`${API_CONFIG.BACKEND_URL}/api/voice-agent/update-context`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -326,7 +326,7 @@ export const submissionAPI = {
             // Trigger knowledge base update for CS500 course
         try {
           if (data.assignment?.course_id === API_CONFIG.CS500_COURSE_ID) {
-            await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/voice-agent/update-context`, {
+            await fetch(`${API_CONFIG.BACKEND_URL}/api/voice-agent/update-context`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -410,7 +410,7 @@ export const submissionAPI = {
             // Trigger knowledge base update for CS500 course
         try {
           if (data.assignment?.course_id === API_CONFIG.CS500_COURSE_ID) {
-            await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/voice-agent/update-context`, {
+            await fetch(`${API_CONFIG.BACKEND_URL}/api/voice-agent/update-context`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -456,7 +456,7 @@ export const submissionAPI = {
             // Trigger knowledge base update for CS500 course
         try {
           if (data.assignment?.course_id === API_CONFIG.CS500_COURSE_ID) {
-            await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/voice-agent/update-context`, {
+            await fetch(`${API_CONFIG.BACKEND_URL}/api/voice-agent/update-context`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

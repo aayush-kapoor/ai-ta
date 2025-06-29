@@ -5,7 +5,7 @@
 
 // Backend API URL - can be overridden by environment variable
 export const API_CONFIG = {
-  BACKEND_URL: import.meta.env.VITE_API_URL || 'http://0.0.0.0:8000',
+  BACKEND_URL: import.meta.env.VITE_API_URL || 'https://mylo-api.onrender.com',
   
   // Course and Agent Configuration
   CS500_COURSE_ID: import.meta.env.VITE_CS500_COURSE_ID,
