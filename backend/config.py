@@ -38,11 +38,24 @@ CORS_ORIGINS = [
     "http://localhost:5174",         # Alternative Vite port
     "http://127.0.0.1:5174",
     "http://localhost:3000",         # Alternative React port
+    "*"  # Allow all origins temporarily for debugging
 ]
 
 # Allow environment variable to override CORS origins
 if os.getenv("CORS_ORIGINS"):
     CORS_ORIGINS = os.getenv("CORS_ORIGINS").split(",")
+
+# Print CORS origins for debugging
+print(f"CORS_ORIGINS configured: {CORS_ORIGINS}")
+
+# Debug environment variables (don't print full keys for security)
+print(f"OPENAI_API_KEY present: {bool(OPENAI_API_KEY)}")
+if OPENAI_API_KEY:
+    print(f"OPENAI_API_KEY length: {len(OPENAI_API_KEY)}")
+    print(f"OPENAI_API_KEY starts with: {OPENAI_API_KEY[:10]}...")
+    print(f"OPENAI_API_KEY ends with: ...{OPENAI_API_KEY[-4:]}")
+else:
+    print("⚠️  OPENAI_API_KEY is not set!")
 
 # Validation
 def validate_config():

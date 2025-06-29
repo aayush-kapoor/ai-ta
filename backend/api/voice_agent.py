@@ -22,6 +22,15 @@ except Exception as e:
     logger.warning(f"ElevenLabs service initialization failed: {e}")
     elevenlabs_service = None
 
+@router.options("/update-context")
+async def update_context_options():
+    """Handle CORS preflight request for update-context endpoint"""
+    return JSONResponse(content={}, headers={
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+    })
+
 @router.post("/update-context", response_model=VoiceAgentResponse)
 async def update_voice_agent_context(
     request: VoiceAgentRequest

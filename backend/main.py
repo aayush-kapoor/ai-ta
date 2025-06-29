@@ -4,7 +4,7 @@ Clean, modular entry point that imports and registers all components
 """
 import logging
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import configuration and validation
@@ -29,13 +29,23 @@ app = FastAPI(
     description="Intelligent AI agent for managing courses and assignments"
 )
 
+# Request logging middleware for debugging
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"Request: {request.method} {request.url}")
+    logger.info(f"Headers: {dict(request.headers)}")
+    response = await call_next(request)
+    logger.info(f"Response: {response.status_code}")
+    return response
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Register API routers
