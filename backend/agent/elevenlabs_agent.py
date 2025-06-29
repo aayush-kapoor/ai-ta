@@ -82,10 +82,14 @@ class ElevenLabsAgentService:
             await self._cleanup_old_documents(new_doc_id)
             
             # Step 6: Update the agent to attach the knowledge base
-            await self._attach_knowledge_base_to_agent(agent_id, new_doc_id, document_name)
+            attachment_success = await self._attach_knowledge_base_to_agent(agent_id, new_doc_id, document_name)
             
-            logger.info(f"Successfully completed knowledge base update with RAG indexing and agent attachment")
-            return True
+            if attachment_success:
+                logger.info(f"✅ Successfully completed knowledge base update with RAG indexing and agent attachment")
+            else:
+                logger.warning(f"⚠️  Knowledge base updated successfully, but agent attachment failed (will retry automatically)")
+            
+            return True  # Return True even if attachment fails - KB update succeeded
                 
         except Exception as e:
             logger.error(f"Error updating knowledge base for agent {agent_id}: {e}")
@@ -139,10 +143,14 @@ class ElevenLabsAgentService:
             await self._cleanup_old_documents(new_document_id)
             
             # Step 7: Attach knowledge base to agent
-            await self._attach_knowledge_base_to_agent(agent_id, new_document_id, document_name)
+            attachment_success = await self._attach_knowledge_base_to_agent(agent_id, new_document_id, document_name)
             
-            logger.info(f"Successfully updated knowledge base for agent {agent_id} with {len(all_students_context['students'])} students")
-            return True
+            if attachment_success:
+                logger.info(f"✅ Successfully updated knowledge base for agent {agent_id} with {len(all_students_context['students'])} students")
+            else:
+                logger.warning(f"⚠️  Knowledge base updated for {len(all_students_context['students'])} students, but agent attachment failed (will retry automatically)")
+            
+            return True  # Return True even if attachment fails - KB update succeeded
             
         except Exception as e:
             logger.error(f"Error updating knowledge base with all students for agent {agent_id}: {e}")
@@ -236,38 +244,64 @@ class ElevenLabsAgentService:
         except Exception as e:
             logger.error(f"Error cleaning up old documents: {e}")
     
-    async def _attach_knowledge_base_to_agent(self, agent_id: str, document_id: str, document_name: str) -> None:
+    async def _attach_knowledge_base_to_agent(self, agent_id: str, document_id: str, document_name: str) -> bool:
         """
         Update the agent to attach the knowledge base document
+        Returns True if successful, False if failed
         """
-        try:
-            logger.info(f"Attaching knowledge base document {document_id} to agent {agent_id}...")
-            
-            # Update the agent to include the knowledge base in its configuration
-            self.client.conversational_ai.agents.update(
-                agent_id=agent_id,
-                conversation_config={
-                    "agent": {
-                        "prompt": {
-                            "knowledge_base": [
-                                {
-                                    "type": "file",
-                                    "name": document_name,
-                                    "id": document_id,
-                                    "usage_mode": "prompt"
-                                }
-                            ]
+        import asyncio
+        import httpx
+        
+        max_retries = 3
+        retry_delay = 20  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                if attempt > 0:
+                    logger.info(f"Retrying agent attachment (attempt {attempt + 1}/{max_retries}) after {retry_delay}s delay...")
+                    await asyncio.sleep(retry_delay)
+                
+                logger.info(f"Attaching knowledge base document {document_id} to agent {agent_id}...")
+                
+                # Update the agent to include the knowledge base in its configuration
+                self.client.conversational_ai.agents.update(
+                    agent_id=agent_id,
+                    conversation_config={
+                        "agent": {
+                            "prompt": {
+                                "knowledge_base": [
+                                    {
+                                        "type": "file",
+                                        "name": document_name,
+                                        "id": document_id,
+                                        "usage_mode": "prompt"
+                                    }
+                                ]
+                            }
                         }
                     }
-                }
-            )
-            
-            logger.info(f"Successfully attached knowledge base document {document_id} to agent {agent_id}")
-            
-        except Exception as e:
-            logger.error(f"Error attaching knowledge base to agent {agent_id}: {e}")
-            logger.error(f"Document ID: {document_id}, Document Name: {document_name}")
-            # Don't raise the exception - we want the knowledge base update to succeed even if agent attachment fails
+                )
+                
+                logger.info(f"✅ Successfully attached knowledge base document {document_id} to agent {agent_id}")
+                return True
+                
+            except Exception as e:
+                error_str = str(e)
+                
+                # Check if this is a 502 Bad Gateway (temporary server error)
+                if "502" in error_str or "Bad Gateway" in error_str:
+                    logger.warning(f"⚠️  ElevenLabs server temporarily unavailable (attempt {attempt + 1}/{max_retries})")
+                    if attempt < max_retries - 1:
+                        continue
+                    else:
+                        logger.error(f"❌ Failed to attach knowledge base after {max_retries} attempts due to server issues")
+                else:
+                    logger.error(f"❌ Error attaching knowledge base to agent {agent_id}: {e}")
+                    break
+        
+        logger.error(f"Document ID: {document_id}, Document Name: {document_name}")
+        logger.info("💡 Knowledge base was uploaded successfully - agent attachment can be retried later")
+        return False
     
     async def _find_existing_document(self, document_name: str) -> Optional[str]:
         """

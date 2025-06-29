@@ -439,3 +439,64 @@ async def get_available_data():
             "courses": [],
             "enrollments": []
         }
+
+@router.post("/retry-attachment/{agent_id}")
+async def retry_agent_attachment(agent_id: str):
+    """
+    Retry attaching the latest knowledge base document to the agent
+    Useful when ElevenLabs servers were temporarily down during knowledge base update
+    """
+    try:
+        logger.info(f"Manual retry of agent attachment for {agent_id}")
+        
+        # Get the most recent knowledge base document (likely the one that failed to attach)
+        documents = elevenlabs_service.client.conversational_ai.knowledge_base.list()
+        
+        if not documents.documents:
+            return {
+                "success": False,
+                "message": "No knowledge base documents found to attach",
+                "agent_id": agent_id
+            }
+        
+        # Sort by creation time and get the most recent
+        latest_doc = documents.documents[0]  # Assuming they're sorted by recency
+        for doc in documents.documents:
+            # Look for CS500 course context document
+            if "course_context" in doc.name and "CS500" in doc.name:
+                latest_doc = doc
+                break
+        
+        logger.info(f"Found document to attach: {latest_doc.id} - {latest_doc.name}")
+        
+        # Attempt to attach the knowledge base to the agent
+        attachment_success = await elevenlabs_service._attach_knowledge_base_to_agent(
+            agent_id, latest_doc.id, latest_doc.name
+        )
+        
+        if attachment_success:
+            return {
+                "success": True,
+                "message": f"Successfully attached knowledge base document to agent {agent_id}",
+                "agent_id": agent_id,
+                "document_id": latest_doc.id,
+                "document_name": latest_doc.name
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"Failed to attach knowledge base document to agent {agent_id} (ElevenLabs servers may still be down)",
+                "agent_id": agent_id,
+                "document_id": latest_doc.id,
+                "document_name": latest_doc.name,
+                "retry_suggestion": "Wait a few minutes and try again"
+            }
+        
+    except Exception as e:
+        logger.error(f"Error in manual agent attachment retry: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "agent_id": agent_id,
+            "message": "Failed to retry agent attachment"
+        }

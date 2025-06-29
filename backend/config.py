@@ -48,15 +48,6 @@ if os.getenv("CORS_ORIGINS"):
 # Print CORS origins for debugging
 print(f"CORS_ORIGINS configured: {CORS_ORIGINS}")
 
-# Debug environment variables (don't print full keys for security)
-print(f"OPENAI_API_KEY present: {bool(OPENAI_API_KEY)}")
-if OPENAI_API_KEY:
-    print(f"OPENAI_API_KEY length: {len(OPENAI_API_KEY)}")
-    print(f"OPENAI_API_KEY starts with: {OPENAI_API_KEY[:10]}...")
-    print(f"OPENAI_API_KEY ends with: ...{OPENAI_API_KEY[-4:]}")
-else:
-    print("⚠️  OPENAI_API_KEY is not set!")
-
 # Validation
 def validate_config():
     """Validate that all required environment variables are set"""
