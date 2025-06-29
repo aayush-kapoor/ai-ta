@@ -81,7 +81,10 @@ class ElevenLabsAgentService:
             # Step 5: Delete all old knowledge base documents except the new one
             await self._cleanup_old_documents(new_doc_id)
             
-            logger.info(f"Successfully completed knowledge base update with RAG indexing")
+            # Step 6: Update the agent to attach the knowledge base
+            await self._attach_knowledge_base_to_agent(agent_id, new_doc_id, document_name)
+            
+            logger.info(f"Successfully completed knowledge base update with RAG indexing and agent attachment")
             return True
                 
         except Exception as e:
@@ -176,6 +179,39 @@ class ElevenLabsAgentService:
         except Exception as e:
             logger.error(f"Error cleaning up old documents: {e}")
     
+    async def _attach_knowledge_base_to_agent(self, agent_id: str, document_id: str, document_name: str) -> None:
+        """
+        Update the agent to attach the knowledge base document
+        """
+        try:
+            logger.info(f"Attaching knowledge base document {document_id} to agent {agent_id}...")
+            
+            # Update the agent to include the knowledge base in its configuration
+            self.client.conversational_ai.agents.update(
+                agent_id=agent_id,
+                conversation_config={
+                    "agent": {
+                        "prompt": {
+                            "knowledge_base": [
+                                {
+                                    "type": "file",
+                                    "name": document_name,
+                                    "id": document_id,
+                                    "usage_mode": "prompt"
+                                }
+                            ]
+                        }
+                    }
+                }
+            )
+            
+            logger.info(f"Successfully attached knowledge base document {document_id} to agent {agent_id}")
+            
+        except Exception as e:
+            logger.error(f"Error attaching knowledge base to agent {agent_id}: {e}")
+            logger.error(f"Document ID: {document_id}, Document Name: {document_name}")
+            # Don't raise the exception - we want the knowledge base update to succeed even if agent attachment fails
+    
     async def _find_existing_document(self, document_name: str) -> Optional[str]:
         """
         Find if a document with the given name already exists
@@ -245,6 +281,41 @@ class ElevenLabsAgentService:
         
         # Return as formatted JSON text
         return json.dumps(knowledge_base_json, indent=2, ensure_ascii=False)
+
+    async def trigger_knowledge_base_update_for_course(self, course_id: str, agent_id: str = "agent_01jyw3jamyf73szrx0803sj6b2") -> None:
+        """
+        Trigger knowledge base update for all enrolled students in a course
+        Only updates for CS500 course (daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5)
+        """
+        try:
+            # Only update for CS500 course
+            CS500_COURSE_ID = "daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5"
+            if course_id != CS500_COURSE_ID:
+                return
+            
+            # Get all enrolled students in this course
+            admin_client = get_authenticated_client()  # Service role
+            enrollments_result = admin_client.table("enrollments").select(
+                "student_id"
+            ).eq("course_id", course_id).execute()
+            
+            if not enrollments_result.data:
+                return
+                
+            # Update knowledge base for each enrolled student
+            for enrollment in enrollments_result.data:
+                student_id = enrollment["student_id"]
+                try:
+                    context_builder = CourseContextBuilder()
+                    context = await context_builder.build_context(student_id, course_id)
+                    if context:
+                        await self.update_knowledge_base(agent_id, context)
+                        print(f"✅ Knowledge base push successful for student {student_id} in CS500")
+                except Exception as e:
+                    logger.error(f"Failed to update knowledge base for student {student_id}: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Error triggering knowledge base updates for course {course_id}: {e}")
 
 class CourseContextBuilder:
     """

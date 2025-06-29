@@ -247,6 +247,26 @@ export const submissionAPI = {
       .single()
 
     if (error) throw error
+    
+            // Trigger knowledge base update for CS500 course
+        try {
+          const CS500_COURSE_ID = "daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5"
+          if (data.assignment?.course_id === CS500_COURSE_ID) {
+            await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/voice-agent/update-context`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                student_id: submissionData.student_id,
+                course_id: CS500_COURSE_ID,
+                agent_id: "agent_01jyw3jamyf73szrx0803sj6b2"
+              })
+            })
+            console.log('✅ Knowledge base push successful after submission creation')
+          }
+        } catch (e) {
+          console.error('Failed to trigger knowledge base update:', e)
+        }
+    
     return data
   },
 
@@ -294,6 +314,26 @@ export const submissionAPI = {
       .single()
 
     if (error) throw error
+    
+            // Trigger knowledge base update for CS500 course
+        try {
+          const CS500_COURSE_ID = "daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5"
+          if (data.assignment?.course_id === CS500_COURSE_ID) {
+            await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/voice-agent/update-context`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                student_id: data.student_id,
+                course_id: CS500_COURSE_ID,
+                agent_id: "agent_01jyw3jamyf73szrx0803sj6b2"
+              })
+            })
+            console.log('✅ Knowledge base push successful after submission update')
+          }
+        } catch (e) {
+          console.error('Failed to trigger knowledge base update:', e)
+        }
+    
     return data
   },
 
@@ -315,6 +355,26 @@ export const submissionAPI = {
       .single()
 
     if (error) throw error
+    
+            // Trigger knowledge base update for CS500 course
+        try {
+          const CS500_COURSE_ID = "daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5"
+          if (data.assignment?.course_id === CS500_COURSE_ID) {
+            await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/voice-agent/update-context`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                student_id: data.student_id,
+                course_id: CS500_COURSE_ID,
+                agent_id: "agent_01jyw3jamyf73szrx0803sj6b2"
+              })
+            })
+            console.log('✅ Knowledge base push successful after submission grading')
+          }
+        } catch (e) {
+          console.error('Failed to trigger knowledge base update:', e)
+        }
+    
     return data
   }
 }

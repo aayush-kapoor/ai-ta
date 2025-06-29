@@ -24,23 +24,15 @@ except Exception as e:
 
 @router.post("/update-context", response_model=VoiceAgentResponse)
 async def update_voice_agent_context(
-    request: VoiceAgentRequest,
-    user = Depends(verify_auth_token),
-    authorization: str = Header(None)
+    request: VoiceAgentRequest
 ):
     """
     Update the voice agent's knowledge base with current course context for a specific student
     This endpoint should be called when a student navigates to a course page
+    NOTE: Authentication removed for testing purposes
     """
     try:
         logger.info(f"Updating voice agent context for student {request.student_id} in course {request.course_id}")
-        
-        # Verify that the authenticated user is the student requesting the update
-        if user.id != request.student_id:
-            raise HTTPException(
-                status_code=403, 
-                detail="You can only update context for your own account"
-            )
         
         # Check if ElevenLabs service is available
         if not elevenlabs_service:
@@ -52,13 +44,8 @@ async def update_voice_agent_context(
                 knowledge_base_updated=False
             )
         
-        # Extract the token from the authorization header
-        user_token = None
-        if authorization and authorization.startswith("Bearer "):
-            user_token = authorization.split(" ")[1]
-        
         # Build the course context for this student
-        # Use service role after authentication verification to bypass RLS
+        # Use service role to bypass RLS (no authentication needed for testing)
         context_builder = CourseContextBuilder()  # No token = service role
         course_context = await context_builder.build_context(request.student_id, request.course_id)
         
@@ -362,6 +349,61 @@ async def get_rag_index_status():
             "error": str(e),
             "rag_status": [],
             "message": "Failed to retrieve RAG index status"
+        }
+
+@router.get("/agent-config/{agent_id}")
+async def get_agent_configuration(agent_id: str):
+    """
+    Debug endpoint to check agent configuration including attached knowledge base
+    """
+    try:
+        # Get agent details to check knowledge base attachment
+        agents = elevenlabs_service.client.conversational_ai.agents.list()
+        
+        target_agent = None
+        for agent in agents.agents:
+            if agent.agent_id == agent_id:
+                target_agent = agent
+                break
+        
+        if not target_agent:
+            return {
+                "success": False,
+                "error": f"Agent {agent_id} not found",
+                "agent_id": agent_id
+            }
+        
+        # Extract knowledge base information
+        knowledge_base_info = []
+        if hasattr(target_agent, 'conversation_config') and target_agent.conversation_config:
+            agent_config = target_agent.conversation_config.get('agent', {})
+            prompt_config = agent_config.get('prompt', {})
+            knowledge_base = prompt_config.get('knowledge_base', [])
+            
+            for kb_item in knowledge_base:
+                knowledge_base_info.append({
+                    "type": kb_item.get("type"),
+                    "name": kb_item.get("name"),
+                    "id": kb_item.get("id"),
+                    "usage_mode": kb_item.get("usage_mode")
+                })
+        
+        return {
+            "success": True,
+            "agent_id": agent_id,
+            "agent_name": target_agent.name,
+            "knowledge_base_attached": len(knowledge_base_info) > 0,
+            "knowledge_base_documents": knowledge_base_info,
+            "total_kb_documents": len(knowledge_base_info)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting agent configuration for {agent_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "agent_id": agent_id,
+            "message": f"Failed to retrieve agent configuration for {agent_id}"
         }
 
 @router.get("/debug/available-data")

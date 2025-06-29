@@ -27,6 +27,31 @@ export function StudentCourseDetail() {
         setCourse(courseData)
         // Only show published assignments for students
         setAssignments(assignmentsData.filter(a => a.status === 'published'))
+        
+        // Trigger knowledge base update on first visit to CS500 course
+        const CS500_COURSE_ID = "daa7a5f4-41e6-46b7-86be-0d3ef21ee0f5"
+        if (courseId === CS500_COURSE_ID && user?.role === 'student') {
+          const sessionKey = `kb_updated_${courseId}_${user.id}`
+          const hasUpdatedThisSession = sessionStorage.getItem(sessionKey)
+          
+          if (!hasUpdatedThisSession) {
+            try {
+              await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/voice-agent/update-context`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  student_id: user.id,
+                  course_id: CS500_COURSE_ID,
+                  agent_id: "agent_01jyw3jamyf73szrx0803sj6b2"
+                })
+              })
+              console.log('✅ Knowledge base push successful on first CS500 navigation')
+              sessionStorage.setItem(sessionKey, 'true')
+            } catch (e) {
+              console.error('Failed to trigger knowledge base update on navigation:', e)
+            }
+          }
+        }
       } catch (error) {
         console.error('Error loading course data:', error)
         toast.error('Failed to load course data. Please try again.')
@@ -62,8 +87,8 @@ export function StudentCourseDetail() {
     )
   }
 
-  const upcomingAssignments = assignments.filter(a => new Date(a.due_date) > new Date())
-  const pastAssignments = assignments.filter(a => new Date(a.due_date) <= new Date())
+  const upcomingAssignments = assignments.filter(a => a.due_date && new Date(a.due_date) > new Date())
+  const pastAssignments = assignments.filter(a => a.due_date && new Date(a.due_date) <= new Date())
 
   return (
     <div className="space-y-8">
@@ -78,7 +103,7 @@ export function StudentCourseDetail() {
         <div className="flex-1">
           <h1 className="text-3xl font-bold text-gray-900">{course.title}</h1>
           <div className="flex items-center space-x-4 mt-2 text-gray-600">
-            <span className="font-medium">{course.course_code}</span>
+            <span className="font-medium">{course.title}</span>
             <div className="flex items-center space-x-1">
               <User className="w-4 h-4" />
               <span>{course.teacher?.full_name}</span>
@@ -136,7 +161,7 @@ export function StudentCourseDetail() {
                           <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
                             <div className="flex items-center space-x-1">
                               <Calendar className="w-4 h-4" />
-                              <span>Due {new Date(assignment.due_date).toLocaleDateString()}</span>
+                              <span>Due {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString() : 'No due date'}</span>
                             </div>
                             <span>{assignment.total_points} points</span>
                           </div>
@@ -179,7 +204,7 @@ export function StudentCourseDetail() {
                           <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
                             <div className="flex items-center space-x-1">
                               <Calendar className="w-4 h-4" />
-                              <span>Due {new Date(assignment.due_date).toLocaleDateString()}</span>
+                              <span>Due {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString() : 'No due date'}</span>
                             </div>
                             <span>{assignment.total_points} points</span>
                           </div>

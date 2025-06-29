@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from supabase import Client
 from database import get_authenticated_client
 from .date_utils import process_date_expression
+from .elevenlabs_agent import ElevenLabsAgentService
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,14 @@ class ActionHandlers:
                 assignment = result.data[0]
                 status_msg = "published and visible to students" if publish else "saved as draft"
                 logger.info(f"📝 CREATE_ASSIGNMENT: Successfully created assignment '{assignment['id']}'")
+                
+                # Trigger knowledge base update for all students in the course
+                try:
+                    elevenlabs_service = ElevenLabsAgentService()
+                    await elevenlabs_service.trigger_knowledge_base_update_for_course(course_id)
+                except Exception as e:
+                    logger.error(f"Failed to trigger knowledge base update: {e}")
+                
                 return {
                     "success": True,
                     "message": f"✅ Created assignment '{title}' for {course_code} worth {points} points and {status_msg}!",
@@ -366,6 +375,13 @@ class ActionHandlers:
             result = admin_client.table("assignments").update(update_data).eq("id", assignment["id"]).execute()
             
             if result.data and len(result.data) > 0:
+                # Trigger knowledge base update for all students in the course
+                try:
+                    elevenlabs_service = ElevenLabsAgentService()
+                    await elevenlabs_service.trigger_knowledge_base_update_for_course(assignment["course_id"])
+                except Exception as e:
+                    logger.error(f"Failed to trigger knowledge base update: {e}")
+                
                 return {
                     "success": True,
                     "message": f"✅ Updated assignment '{assignment['title']}' - changed {', '.join(changes)}!",
@@ -574,6 +590,13 @@ class ActionHandlers:
             result = admin_client.table("assignments").update(update_data).eq("id", assignment["id"]).execute()
             
             if result.data and len(result.data) > 0:
+                # Trigger knowledge base update for all students in the course
+                try:
+                    elevenlabs_service = ElevenLabsAgentService()
+                    await elevenlabs_service.trigger_knowledge_base_update_for_course(assignment["course_id"])
+                except Exception as e:
+                    logger.error(f"Failed to trigger knowledge base update: {e}")
+                
                 # Create enhanced success message with course context if applicable
                 success_message = f"✅ Updated rubric for assignment '{assignment['title']}'"
                 if course_name:
@@ -729,6 +752,13 @@ class ActionHandlers:
             result = admin_client.table("assignments").delete().eq("id", assignment["id"]).execute()
             
             if result.data and len(result.data) > 0:
+                # Trigger knowledge base update for all students in the course
+                try:
+                    elevenlabs_service = ElevenLabsAgentService()
+                    await elevenlabs_service.trigger_knowledge_base_update_for_course(assignment["course_id"])
+                except Exception as e:
+                    logger.error(f"Failed to trigger knowledge base update: {e}")
+                
                 return {
                     "success": True,
                     "message": f"✅ Successfully deleted assignment '{assignment['title']}'!",
@@ -995,6 +1025,14 @@ class ActionHandlers:
             if result.data:
                 course = result.data[0]
                 logger.info(f"🏫 CREATE_COURSE: Successfully created course '{course['id']}'")
+                
+                # Trigger knowledge base update for all students in the course
+                try:
+                    elevenlabs_service = ElevenLabsAgentService()
+                    await elevenlabs_service.trigger_knowledge_base_update_for_course(course["id"])
+                except Exception as e:
+                    logger.error(f"Failed to trigger knowledge base update: {e}")
+                
                 return {
                     "success": True,
                     "message": f"✅ Created course '{title}'!",
@@ -1069,6 +1107,13 @@ class ActionHandlers:
             result = db_client.table("courses").update(update_data).eq("id", course["id"]).execute()
             
             if result.data:
+                # Trigger knowledge base update for all students in the course
+                try:
+                    elevenlabs_service = ElevenLabsAgentService()
+                    await elevenlabs_service.trigger_knowledge_base_update_for_course(course["id"])
+                except Exception as e:
+                    logger.error(f"Failed to trigger knowledge base update: {e}")
+                
                 return {
                     "success": True,
                     "message": f"✅ Updated course '{course['title']}' - changed {', '.join(changes)}!",
@@ -1304,6 +1349,13 @@ class ActionHandlers:
             result = db_client.table("assignments").update(update_data).eq("id", assignment["id"]).execute()
             
             if result.data:
+                # Trigger knowledge base update for all students in the course
+                try:
+                    elevenlabs_service = ElevenLabsAgentService()
+                    await elevenlabs_service.trigger_knowledge_base_update_for_course(assignment["course_id"])
+                except Exception as e:
+                    logger.error(f"Failed to trigger knowledge base update: {e}")
+                
                 action_msg = "published and visible to students" if new_status == "published" else "unpublished and hidden from students"
                 return {
                     "success": True,
