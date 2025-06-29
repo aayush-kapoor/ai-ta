@@ -307,6 +307,63 @@ async def list_knowledge_base_documents():
             "message": "Failed to retrieve knowledge base documents from ElevenLabs"
         }
 
+@router.get("/rag-status")
+async def get_rag_index_status():
+    """
+    Get RAG index status for all knowledge base documents
+    """
+    try:
+        documents = elevenlabs_service.client.conversational_ai.knowledge_base.list()
+        rag_status = []
+        
+        for doc in documents.documents:
+            try:
+                # Get RAG indices for this document
+                rag_response = elevenlabs_service.client.conversational_ai.get_document_rag_indexes(
+                    documentation_id=doc.id
+                )
+                
+                doc_rag_info = {
+                    "document_id": doc.id,
+                    "document_name": doc.name,
+                    "rag_indices": []
+                }
+                
+                for rag_index in rag_response.indexes:
+                    doc_rag_info["rag_indices"].append({
+                        "id": rag_index.id,
+                        "model": rag_index.model,
+                        "status": rag_index.status,
+                        "progress_percentage": rag_index.progress_percentage,
+                        "used_bytes": getattr(rag_index.document_model_index_usage, 'used_bytes', None)
+                    })
+                
+                rag_status.append(doc_rag_info)
+                
+            except Exception as e:
+                logger.warning(f"Could not get RAG status for document {doc.id}: {e}")
+                rag_status.append({
+                    "document_id": doc.id,
+                    "document_name": doc.name,
+                    "rag_indices": [],
+                    "error": str(e)
+                })
+        
+        return {
+            "success": True,
+            "rag_status": rag_status,
+            "message": "RAG index status for all documents"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting RAG index status: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "rag_status": [],
+            "message": "Failed to retrieve RAG index status"
+        }
+
 @router.get("/debug/available-data")
 async def get_available_data():
     """

@@ -48,44 +48,133 @@ class ElevenLabsAgentService:
     
     async def update_knowledge_base(self, agent_id: str, context: VoiceAgentContext) -> bool:
         """
-        Update the knowledge base with the latest course context
-        Note: Knowledge base documents are global in ElevenLabs, not per-agent
+        Update the knowledge base with the latest course context and RAG indexing
+        Flow: Delete old RAG indices -> Upload new document -> Create RAG index -> Clean up old documents
         """
         try:
-            logger.info(f"Creating/updating knowledge base document for course {context.course.id} and student {context.student.id}")
+            logger.info(f"Starting knowledge base update for course {context.course.id} and student {context.student.id}")
             
-            # Create a comprehensive context document
+            # Step 1: Delete existing RAG indices for any existing documents
+            await self._delete_existing_rag_indices()
+            
+            # Step 2: Create a comprehensive context document in JSON format
             context_document = self._create_context_document(context)
+            
+            # Parse the JSON, set the agent_id, and convert back to string
+            context_json = json.loads(context_document)
+            context_json["agent_id"] = agent_id
+            context_document = json.dumps(context_json, indent=2, ensure_ascii=False)
+            
             document_name = f"course_context_{context.course.id}_{context.student.id}"
             
-            # First, check if a document with this name already exists
-            existing_doc_id = await self._find_existing_document(document_name)
-            
-            if existing_doc_id:
-                # Update existing document
-                logger.info(f"Updating existing document: {existing_doc_id}")
-                # Note: The update endpoint only allows updating the name, not content
-                # So we'll delete and recreate for now
-                try:
-                    self.client.conversational_ai.knowledge_base.documents.delete(
-                        documentation_id=existing_doc_id
-                    )
-                    logger.info(f"Deleted existing document: {existing_doc_id}")
-                except Exception as e:
-                    logger.warning(f"Could not delete existing document {existing_doc_id}: {e}")
-            
-            # Create new knowledge base document from text
+            # Step 3: Create new knowledge base document from text (JSON as text)
             response = self.client.conversational_ai.knowledge_base.documents.create_from_text(
                 text=context_document,
                 name=document_name
             )
+            new_doc_id = response.id
+            logger.info(f"Successfully created knowledge base document: {new_doc_id} - {response.name}")
             
-            logger.info(f"Successfully created knowledge base document: {response.id} - {response.name}")
+            # Step 4: Create RAG index for the new document
+            await self._create_rag_index(new_doc_id)
+            
+            # Step 5: Delete all old knowledge base documents except the new one
+            await self._cleanup_old_documents(new_doc_id)
+            
+            logger.info(f"Successfully completed knowledge base update with RAG indexing")
             return True
                 
         except Exception as e:
             logger.error(f"Error updating knowledge base for agent {agent_id}: {e}")
             return False
+    
+    async def _delete_existing_rag_indices(self) -> None:
+        """
+        Delete all existing RAG indices from all knowledge base documents
+        """
+        try:
+            logger.info("Deleting existing RAG indices...")
+            
+            # Get all knowledge base documents
+            documents = self.client.conversational_ai.knowledge_base.list()
+            
+            for doc in documents.documents:
+                try:
+                    # Get RAG indices for this document
+                    rag_response = self.client.conversational_ai.get_document_rag_indexes(
+                        documentation_id=doc.id
+                    )
+                    
+                    # Delete each RAG index
+                    for rag_index in rag_response.indexes:
+                        try:
+                            self.client.conversational_ai.delete_document_rag_index(
+                                documentation_id=doc.id,
+                                rag_index_id=rag_index.id
+                            )
+                            logger.info(f"Deleted RAG index {rag_index.id} for document {doc.id}")
+                        except Exception as e:
+                            logger.warning(f"Could not delete RAG index {rag_index.id}: {e}")
+                            
+                except Exception as e:
+                    logger.warning(f"Could not get/delete RAG indices for document {doc.id}: {e}")
+            
+            logger.info("Completed deleting existing RAG indices")
+            
+        except Exception as e:
+            logger.error(f"Error deleting existing RAG indices: {e}")
+    
+    async def _create_rag_index(self, document_id: str) -> None:
+        """
+        Create RAG index for the specified document
+        """
+        try:
+            logger.info(f"Creating RAG index for document {document_id}...")
+            
+            # Create RAG index using the recommended embedding model
+            embedding_model = "e5_mistral_7b_instruct"
+            
+            response = self.client.conversational_ai.knowledge_base.document.compute_rag_index(
+                documentation_id=document_id,
+                model=embedding_model
+            )
+            
+            logger.info(f"RAG index creation initiated for document {document_id} with model {embedding_model}")
+            logger.info(f"RAG index ID: {response.id}, Status: {response.status}")
+            
+            # Note: The indexing happens asynchronously, so we don't wait for completion here
+            # The status can be checked later if needed
+            
+        except Exception as e:
+            logger.error(f"Error creating RAG index for document {document_id}: {e}")
+    
+    async def _cleanup_old_documents(self, keep_doc_id: str) -> None:
+        """
+        Delete all knowledge base documents except the one specified
+        """
+        try:
+            logger.info(f"Cleaning up old documents, keeping document {keep_doc_id}...")
+            
+            # Get all knowledge base documents
+            documents = self.client.conversational_ai.knowledge_base.list()
+            
+            deleted_count = 0
+            for doc in documents.documents:
+                if doc.id != keep_doc_id:
+                    try:
+                        self.client.conversational_ai.knowledge_base.documents.delete(
+                            documentation_id=doc.id,
+                            force=True  # Force delete even if used by agents
+                        )
+                        logger.info(f"Deleted old document: {doc.id} - {doc.name}")
+                        deleted_count += 1
+                    except Exception as e:
+                        logger.warning(f"Could not delete document {doc.id}: {e}")
+            
+            logger.info(f"Cleanup completed. Deleted {deleted_count} old documents, kept {keep_doc_id}")
+            
+        except Exception as e:
+            logger.error(f"Error cleaning up old documents: {e}")
     
     async def _find_existing_document(self, document_name: str) -> Optional[str]:
         """
@@ -108,74 +197,54 @@ class ElevenLabsAgentService:
     
     def _create_context_document(self, context: VoiceAgentContext) -> str:
         """
-        Create a comprehensive context document for the knowledge base
+        Create a comprehensive context document for the knowledge base in JSON format
+        matching the KB.json structure exactly, but returned as a text string
         """
-        doc = f"""COURSE CONTEXT FOR AI TEACHING ASSISTANT
-Generated: {context.context_updated_at}
-
-=== STUDENT INFORMATION ===
-Student Name: {context.student.name}
-Student ID: {context.student.id}
-Student Email: {context.student.email}
-
-IMPORTANT: This knowledge base is ONLY for {context.student.name}. Do not share or reference information about other students.
-
-=== COURSE INFORMATION ===
-Course ID: {context.course.id}
-Course Title: {context.course.title}
-Course Description: {context.course.description or "No description available"}
-
-=== ASSIGNMENTS IN THIS COURSE ===
-Total Assignments: {len(context.course.assignments)}
-
-"""
         
-        for i, assignment in enumerate(context.course.assignments, 1):
-            doc += f"""
---- ASSIGNMENT {i}: {assignment.title} ---
-Assignment ID: {assignment.id}
-Title: {assignment.title}
-Description: {assignment.description or "No description available"}
-Due Date: {assignment.due_date or "No due date set"}
-Total Points: {assignment.total_points}
-Status: {assignment.status}
-
-RUBRIC:
-{assignment.rubric or "No rubric available"}
-
-STUDENT'S SUBMISSION STATUS:
-Has Submitted: {"Yes" if assignment.has_submission else "No"}
-"""
-            
-            if assignment.has_submission:
-                doc += f"""Submission Status: {assignment.submission_status or "Unknown"}
-Grade: {assignment.grade if assignment.grade is not None else "Not yet graded"}
-Feedback: {assignment.feedback or "No feedback provided yet"}
-
-SUBMISSION CONTENT:
-{assignment.submission_content or "No content available (file-based submission)"}
-"""
-            else:
-                doc += "No submission yet - student should be reminded about the assignment and deadline.\n"
-            
-            doc += "\n" + "="*80 + "\n"
+        # Convert assignments to the exact format shown in KB.json
+        assignments_json = []
+        for assignment in context.course.assignments:
+            assignment_dict = {
+                "id": assignment.id,
+                "title": assignment.title,
+                "description": assignment.description,
+                "due_date": assignment.due_date,
+                "total_points": assignment.total_points,
+                "status": assignment.status,
+                "rubric": assignment.rubric,
+                "has_submission": assignment.has_submission,
+                "submission_status": assignment.submission_status,
+                "submission_file_path": assignment.submission_file_path,
+                "submission_content": assignment.submission_content,
+                "grade": assignment.grade,
+                "feedback": assignment.feedback
+            }
+            assignments_json.append(assignment_dict)
         
-        doc += f"""
-=== SUMMARY FOR AI ASSISTANT ===
-You are helping {context.student.name} with the {context.course.title} course.
-
-Key things to remember:
-1. Only discuss {context.student.name}'s own work and progress
-2. Help them understand assignment requirements and rubrics
-3. If they have questions about grades/feedback, refer to the specific information above
-4. Encourage them to complete missing assignments
-5. Be supportive and educational in your responses
-6. If you don't have specific information, guide them to contact their instructor
-
-PRIVACY: Never mention or discuss other students' work or performance.
-"""
+        # Create the complete JSON structure matching KB.json exactly
+        knowledge_base_json = {
+            "success": True,
+            "message": f"Voice agent context updated successfully for {context.course.title}",
+            "context": {
+                "student": {
+                    "id": context.student.id,
+                    "name": context.student.name,
+                    "email": context.student.email
+                },
+                "course": {
+                    "id": context.course.id,
+                    "title": context.course.title,
+                    "description": context.course.description,
+                    "assignments": assignments_json
+                },
+                "context_updated_at": context.context_updated_at
+            },
+            "agent_id": None,  # Will be set by the calling function
+            "knowledge_base_updated": True
+        }
         
-        return doc
+        # Return as formatted JSON text
+        return json.dumps(knowledge_base_json, indent=2, ensure_ascii=False)
 
 class CourseContextBuilder:
     """
