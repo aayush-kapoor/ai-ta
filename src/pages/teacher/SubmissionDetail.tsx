@@ -267,7 +267,7 @@ export function SubmissionDetail() {
                     </p>
                   </div>
                   
-                  <div className="bg-white rounded-lg p-4 border border-purple-200">
+                  {/* <div className="bg-white rounded-lg p-4 border border-purple-200">
                     <p className="text-sm text-purple-600 font-medium">AI Confidence</p>
                     <div className="flex items-center space-x-2 mt-1">
                       <div className="flex-1 bg-purple-100 rounded-full h-2">
@@ -280,7 +280,7 @@ export function SubmissionDetail() {
                         {Math.round(autoGradeResult.detailed_result.confidence_level * 100)}%
                       </span>
                     </div>
-                  </div>
+                  </div> */}
                 </div>
                 
                 {/* Overall Feedback */}
